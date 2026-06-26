@@ -1,0 +1,44 @@
+[
+  {
+    "id": "insight-eligibility-verification-crossover",
+    "type": "crossover",
+    "title": "Eligibility Verification is a shared process between the Recruiting and Scholarship Program initiatives.",
+    "entitiesInvolved": [
+      "init-recruiting",
+      "init-scholarship-program",
+      "proc-eligibility-verification",
+      "person-maria-lopez",
+      "sys-eligibility-spreadsheet"
+    ],
+    "explanation": "The 'Eligibility Verification' process is a critical shared dependency for both the Recruiting and Scholarship Program initiatives. Maria Lopez owns this process and the 'Eligibility Spreadsheet' system it uses, and the graph indicates she is a bottleneck for this process. This single point of failure introduces significant risk to both initiatives if Maria Lopez is unavailable or overwhelmed.",
+    "recommendedAction": "Implement a redundant ownership or automation solution for Eligibility Verification to mitigate single-point-of-failure risk.",
+    "financialImpact": {
+      "headline": "Cross-training a backup and templating the eligibility step removes a single point of failure spanning two initiatives, returns about 16 hours per week (about $34K per year), and protects roughly 120 applications per week of enrollment throughput that today depends on one person.",
+      "value": 34560,
+      "unit": "USD/year",
+      "basis": "120 applications/week × 8 min manual review = 16 hrs/week; 16 hrs × 48 weeks × $45/hr fully loaded ≈ $34,560/year. Inputs are placeholders pending FP&A confirmation."
+    },
+    "confidence": "high",
+    "needsHumanReview": false
+  },
+  {
+    "id": "insight-finance-approver-suspected",
+    "type": "crossover",
+    "title": "Possible shared finance approver between Award Determination and Payment Processing",
+    "entitiesInvolved": [
+      "proc-award",
+      "proc-payment"
+    ],
+    "explanation": "Award Determination in the scholarship program and Payment Processing in the recruiting funnel may both require sign-off from the same finance approver, which would be a second crossover. The conversations reference a finance approval step in both flows, but Maria explicitly said she was not sure it is the same person, so the evidence is incomplete.",
+    "recommendedAction": "Confirm whether the two approval steps share one approver before treating this as a real dependency.",
+    "financialImpact": {
+      "headline": "Impact not yet quantified, pending confirmation of the shared approver.",
+      "value": 0,
+      "unit": "USD/year",
+      "basis": "Evidence is incomplete. No reliable estimate until the dependency is confirmed."
+    },
+    "confidence": "low",
+    "needsHumanReview": true,
+    "whatToCheck": "Ask Finance whether Award Determination and Payment Processing route to the same approver. If yes, model it as a second crossover and quantify the delay risk. If no, dismiss it."
+  }
+]

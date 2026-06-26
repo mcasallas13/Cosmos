@@ -1,0 +1,17 @@
+{
+  "id": "insight-finance-approver-suspected",
+  "type": "crossover",
+  "title": "Possible shared finance approver between Award Determination and Payment Processing",
+  "entitiesInvolved": ["proc-award", "proc-payment"],
+  "explanation": "Award Determination in the scholarship program and Payment Processing in the recruiting funnel may both require sign-off from the same finance approver, which would be a second crossover. The conversations reference a finance approval step in both flows, but Maria explicitly said she was not sure it is the same person, so the evidence is incomplete.",
+  "recommendedAction": "Confirm whether the two approval steps share one approver before treating this as a real dependency.",
+  "financialImpact": {
+    "headline": "Impact not yet quantified, pending confirmation of the shared approver.",
+    "value": 0,
+    "unit": "USD/year",
+    "basis": "Evidence is incomplete. No reliable estimate until the dependency is confirmed."
+  },
+  "confidence": "low",
+  "needsHumanReview": true,
+  "whatToCheck": "Ask Finance whether Award Determination and Payment Processing route to the same approver. If yes, model it as a second crossover and quantify the delay risk. If no, dismiss it."
+}

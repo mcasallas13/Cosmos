@@ -1,0 +1,175 @@
+{
+  "entities": [
+    {
+      "id": "person-chris",
+      "type": "person",
+      "name": "Chris",
+      "attributes": {
+        "role": "Yard Sales person",
+        "team": "Home"
+      }
+    },
+    {
+      "id": "person-michael",
+      "type": "person",
+      "name": "Michael",
+      "attributes": {
+        "role": "Home owner",
+        "team": "Team Home"
+      }
+    },
+    {
+      "id": "person-jacob",
+      "type": "person",
+      "name": "Jacob",
+      "attributes": {
+        "role": "Unknown",
+        "team": "Unknown"
+      }
+    },
+    {
+      "id": "person-christine",
+      "type": "person",
+      "name": "Christine",
+      "attributes": {
+        "role": "Unknown",
+        "team": "Unknown"
+      }
+    },
+    {
+      "id": "sys-spreadsheet",
+      "type": "system",
+      "name": "Spreadsheet",
+      "attributes": {
+        "role": "Tracking tool"
+      }
+    },
+    {
+      "id": "sys-notepad-excel",
+      "type": "system",
+      "name": "Notepad and Excel",
+      "attributes": {
+        "role": "Inventory tool"
+      }
+    },
+    {
+      "id": "proc-pricing",
+      "type": "process",
+      "name": "Pricing items",
+      "attributes": {
+        "role": "Operational process"
+      }
+    },
+    {
+      "id": "proc-tagging",
+      "type": "process",
+      "name": "Tagging items",
+      "attributes": {
+        "role": "Operational process"
+      }
+    },
+    {
+      "id": "proc-placement",
+      "type": "process",
+      "name": "Placing items on table",
+      "attributes": {
+        "role": "Operational process"
+      }
+    },
+    {
+      "id": "proc-qualification",
+      "type": "process",
+      "name": "Qualifying items",
+      "attributes": {
+        "role": "Operational process"
+      }
+    },
+    {
+      "id": "init-yard-sale",
+      "type": "initiative",
+      "name": "Yard Sale",
+      "attributes": {
+        "role": "Project"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "source": "person-chris",
+      "target": "proc-pricing",
+      "type": "owns",
+      "label": "manages pricing"
+    },
+    {
+      "id": "r2",
+      "source": "proc-pricing",
+      "target": "sys-spreadsheet",
+      "type": "uses",
+      "label": "tracks pricing"
+    },
+    {
+      "id": "r3",
+      "source": "proc-pricing",
+      "target": "proc-placement",
+      "type": "hands_off_to",
+      "label": "passes to Jacob"
+    },
+    {
+      "id": "r4",
+      "source": "person-jacob",
+      "target": "proc-placement",
+      "type": "owns",
+      "label": "manages placement"
+    },
+    {
+      "id": "r5",
+      "source": "person-michael",
+      "target": "proc-qualification",
+      "type": "owns",
+      "label": "manages qualification"
+    },
+    {
+      "id": "r6",
+      "source": "proc-qualification",
+      "target": "sys-notepad-excel",
+      "type": "uses",
+      "label": "logs inventory"
+    },
+    {
+      "id": "r7",
+      "source": "proc-qualification",
+      "target": "person-christine",
+      "type": "hands_off_to",
+      "label": "hands off for pricing"
+    },
+    {
+      "id": "r8",
+      "source": "proc-qualification",
+      "target": "proc-tagging",
+      "type": "part_of",
+      "label": "leads to tagging"
+    },
+    {
+      "id": "r9",
+      "source": "person-michael",
+      "target": "proc-tagging",
+      "type": "owns",
+      "label": "responsible for tagging"
+    },
+    {
+      "id": "r10",
+      "source": "proc-pricing",
+      "target": "init-yard-sale",
+      "type": "part_of",
+      "label": "initiative component"
+    },
+    {
+      "id": "r11",
+      "source": "proc-qualification",
+      "target": "init-yard-sale",
+      "type": "part_of",
+      "label": "initiative component"
+    }
+  ]
+}

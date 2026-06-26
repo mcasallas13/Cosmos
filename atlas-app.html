@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas · Project Insights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1320; --surface:#151D2E; --surface-2:#1B2438; --raised:#212C44;
+    --line:#2A3550; --line-soft:#222C42;
+    --text:#E9EDF6; --muted:#97A3BC; --faint:#647187;
+    --c-init:#8E88F4; --c-proc:#4FD1B0; --c-person:#E5A86E; --c-system:#DC8FB6;
+    --risk:#FF7A59; --risk-strong:#FF5A3C; --risk-soft:#3a2236;
+    --ok:#4FD1B0; --warn:#E5A86E;
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --sans:'Space Grotesk',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;line-height:1.5;min-height:100vh}
+  .mono{font-family:var(--mono)}
+  button{font-family:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--c-init);outline-offset:2px;border-radius:6px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+
+  .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh}
+
+  /* sidebar */
+  .sidebar{background:var(--surface);border-right:1px solid var(--line-soft);display:flex;flex-direction:column;padding:16px 12px}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .mark{width:32px;height:32px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;border:1px solid var(--line);flex:none}
+  .brand h1{font-size:17px;font-weight:600;margin:0;letter-spacing:-.01em}
+  .brand .sub{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.06em;display:block;margin-top:1px}
+  .nav{display:flex;flex-direction:column;gap:3px}
+  .navitem{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;border:none;background:transparent;color:var(--muted);font-size:13.5px;text-align:left;width:100%;transition:.15s;position:relative}
+  .navitem svg{flex:none;opacity:.85}
+  .navitem .num{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .navitem:hover{background:var(--surface-2);color:var(--text)}
+  .navitem.active{background:var(--surface-2);color:var(--text)}
+  .navitem.active::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--c-init)}
+  .nav-stage{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:14px 11px 6px}
+  .side-foot{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--line-soft)}
+  .side-foot .chip{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:7px}
+  .side-foot .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+
+  .viewport{min-width:0;display:flex;flex-direction:column}
+  .view{display:none;flex-direction:column;flex:1;min-height:0}
+  .view.active{display:flex}
+
+  .vhead{display:flex;align-items:center;gap:14px;padding:18px 26px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .vhead .vt{min-width:0}
+  .vhead h2{font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em}
+  .vhead .vd{font-size:13px;color:var(--muted);margin-top:2px}
+  .vhead .sp{flex:1}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;font-weight:500;font-size:13.5px;padding:9px 15px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);transition:.15s;white-space:nowrap}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.primary{background:var(--c-init);color:#10131f;border-color:transparent;font-weight:600}
+  .btn.risk{background:var(--risk);color:#1a0e08;border-color:transparent;font-weight:600}
+  .btn:disabled{opacity:.5;cursor:default;filter:none}
+  .btn.ghost{background:transparent}
+
+  /* ===== SESSIONS ===== */
+  .sbody{display:grid;grid-template-columns:1.1fr 1fr;gap:0;flex:1;min-height:0}
+  .slist{padding:18px 22px;border-right:1px solid var(--line-soft);overflow:auto}
+  .slist .lhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .slist .lhead .eyebrow{margin:0}
+  .scard{display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid var(--line-soft);border-radius:12px;background:var(--surface);margin-bottom:10px;cursor:pointer;transition:.15s;width:100%;text-align:left;color:inherit}
+  .scard:hover{border-color:var(--line);background:var(--surface-2)}
+  .scard.sel{border-color:var(--c-init);background:var(--surface-2)}
+  .avatar{width:38px;height:38px;border-radius:10px;background:var(--raised);display:grid;place-items:center;font-family:var(--mono);font-size:13px;color:var(--text);flex:none}
+  .scard .si{flex:1;min-width:0}
+  .scard .sn{font-size:14px;font-weight:500;margin:0}
+  .scard .sr{font-size:12px;color:var(--muted);margin:1px 0 0;font-family:var(--mono)}
+  .scard .smeta{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:none}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:3px 7px;border-radius:5px;background:rgba(79,209,176,.13);color:var(--ok);margin-top:5px}
+  .pill.gray{background:var(--raised);color:var(--muted)}
+
+  .sdetail{padding:18px 22px;overflow:auto;display:flex;flex-direction:column}
+  .sdetail .dh{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .sdetail .dh h3{margin:0;font-size:16px;font-weight:600}
+  .sdetail .dsub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px}
+  .transcript{flex:1}
+  .turn{margin-bottom:13px}
+  .turn .who{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+  .turn.atlas .who{color:var(--c-init)} .turn.you .who{color:var(--c-person)}
+  .turn .bubble{font-size:13.5px;line-height:1.6;padding:10px 13px;border-radius:10px;border:1px solid var(--line-soft)}
+  .turn.atlas .bubble{background:var(--surface)}
+  .turn.you .bubble{background:var(--surface-2)}
+  .detail-empty{flex:1;display:grid;place-items:center;text-align:center;color:var(--faint);font-size:13px;padding:30px}
+  .gen-bar{position:sticky;bottom:0;padding-top:14px;margin-top:8px;background:linear-gradient(0deg,var(--bg) 60%,transparent);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .gen-bar .note{font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+  /* ===== INTERVIEW ===== */
+  .ivwrap{flex:1;display:grid;grid-template-columns:1.15fr 1fr;min-height:0}
+  .iv-stage{padding:24px 26px;display:flex;flex-direction:column;border-right:1px solid var(--line-soft);background:radial-gradient(130% 70% at 50% 0%, rgba(142,136,244,.06), transparent 60%)}
+  .iv-setup{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:auto}
+  .iv-setup .who{display:flex;align-items:center;gap:10px}
+  .iv-setup .qn{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .qcard{margin:auto 0;text-align:center;max-width:440px;align-self:center}
+  .qcard .qlabel{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-init);margin-bottom:14px}
+  .qcard .q{font-size:23px;font-weight:500;line-height:1.35;letter-spacing:-.01em}
+  .mic-zone{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:18px}
+  .mic{width:72px;height:72px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;color:var(--text);transition:.2s}
+  .mic:hover{filter:brightness(1.1)}
+  .mic.rec{border-color:var(--risk);color:var(--risk);box-shadow:0 0 0 6px rgba(255,122,89,.12)}
+  .mic.rec svg{display:none}
+  .wave{display:none;align-items:center;gap:3px;height:24px}
+  .mic.rec .wave{display:flex}
+  .wave i{width:3px;height:6px;background:var(--risk);border-radius:2px;animation:wv .9s ease-in-out infinite}
+  .wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.15s}
+  @keyframes wv{0%,100%{height:6px}50%{height:22px}}
+  .mic-status{font-family:var(--mono);font-size:11.5px;color:var(--muted);min-height:16px;text-align:center}
+  .mic-status .stt{color:var(--c-proc)}
+
+  .iv-live{padding:18px 22px;display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+  .iv-live .lh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .iv-live .lh .eyebrow{margin:0}
+  .iv-feed{flex:1;overflow:auto;display:flex;flex-direction:column}
+  .live-line{font-size:13px;color:var(--c-proc);font-family:var(--mono);min-height:18px;margin-top:6px;border-top:1px dashed var(--line-soft);padding-top:8px}
+  .iv-foot{padding-top:12px;display:flex;gap:10px;align-items:center}
+
+  /* ===== WORKSPACE (map + insight), from v1 ===== */
+  .work{display:grid;grid-template-columns:1.55fr 1fr;flex:1;min-height:0}
+  .panel{padding:18px 22px;min-width:0}
+  .panel.map{border-right:1px solid var(--line-soft);background:radial-gradient(120% 80% at 50% -10%, rgba(142,136,244,.06), transparent 60%)}
+  .phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:10px}
+  .phead h3{font-size:13px;font-weight:500;margin:0;color:var(--text)}
+  .legend{display:flex;gap:13px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .lg{width:8px;height:8px;border-radius:2px}.lgline{width:16px;height:0;border-top:2px dashed var(--risk)}
+  .map-empty{display:grid;place-items:center;text-align:center;color:var(--faint);font-size:13px;height:340px;line-height:1.6}
+  svg.graph{width:100%;height:auto;display:block}
+  .edge{fill:none;stroke:var(--line);stroke-width:1.4}
+  .edge.risk{stroke:var(--line);stroke-width:1.4;stroke-dasharray:5 5;opacity:.5;transition:stroke .5s,opacity .5s,stroke-width .5s}
+  .map.on .edge.risk{stroke:var(--risk);opacity:1;stroke-width:2.4}
+  .risk-arc{fill:none;stroke:var(--risk);stroke-width:2.4;stroke-linecap:round;stroke-dasharray:760;stroke-dashoffset:760;opacity:0;transition:stroke-dashoffset 1.1s ease,opacity .4s}
+  .map.on .risk-arc{stroke-dashoffset:0;opacity:.92}
+  .node .nbg{fill:var(--surface-2);stroke:var(--line);stroke-width:1}
+  .node .acc{fill:currentColor}.node .ic{stroke:currentColor;fill:none;stroke-width:1.5}.node .ic .fl{fill:currentColor;stroke:none}
+  .node .nl{fill:var(--text);font-family:var(--sans);font-size:12.5px;font-weight:500}
+  .node .nm{fill:var(--muted);font-family:var(--mono);font-size:10px}
+  .node.t-init{color:var(--c-init)}.node.t-proc{color:var(--c-proc)}.node.t-person{color:var(--c-person)}.node.t-system{color:var(--c-system)}
+  .ring{fill:none;stroke:var(--risk);stroke-width:1.8;opacity:0;transition:opacity .4s}
+  .map.on .node.shared .ring{opacity:1;animation:pulse 1.9s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+  .risk-tag{opacity:0;transition:opacity .4s .3s}.map.on .risk-tag{opacity:1}
+  .panel.insight{display:flex;flex-direction:column;gap:14px;background:var(--surface);overflow:auto}
+  .empty{border:1px dashed var(--line);border-radius:var(--r-md);padding:26px 18px;text-align:center;color:var(--faint);font-size:13px;line-height:1.6}
+  .empty svg{margin-bottom:10px;opacity:.55}
+  .card{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;opacity:0;transform:translateY(10px);transition:.5s}
+  .card.show{opacity:1;transform:none}
+  .card.hero{border-color:rgba(255,122,89,.4)}
+  .badges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .bdg{font-family:var(--mono);font-size:11px;letter-spacing:.06em;padding:4px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:5px}
+  .bdg.risk{background:var(--risk-soft);color:var(--risk)}.bdg.neutral{background:var(--raised);color:var(--muted)}.bdg.warn{background:rgba(229,168,110,.14);color:var(--warn)}
+  .ctitle{font-size:17px;font-weight:600;margin:0 0 8px;line-height:1.3}
+  .cbody{font-size:13.5px;color:var(--muted);line-height:1.6;margin:0 0 14px}.cbody b{color:var(--text);font-weight:500}
+  .conf{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+  .conf .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+  .meter{flex:1;height:5px;border-radius:3px;background:var(--raised);overflow:hidden}.meter i{display:block;height:100%;width:0;border-radius:3px;background:var(--ok);transition:width 1s ease .2s}
+  .conf .pct{font-family:var(--mono);font-size:11px;color:var(--ok)}
+  .action{display:flex;gap:10px;padding:11px 12px;background:var(--bg);border:1px solid var(--line-soft);border-radius:var(--r-sm);margin:0 0 14px}
+  .action .k{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 3px}
+  .action p{margin:0;font-size:13px;color:var(--text);line-height:1.5}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{background:var(--bg);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:11px 13px}
+  .stat .sl{font-size:11px;color:var(--muted);margin:0 0 5px}.stat .sv{font-family:var(--mono);font-size:21px;font-weight:500;color:var(--text);margin:0;line-height:1}
+  .stat.lead .sv{color:var(--risk)}
+  .rev-actions{display:flex;gap:9px}
+  .ba{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--text)}
+  .ba.primary{background:var(--warn);color:#1a1305;border-color:transparent}.ba:hover{filter:brightness(1.07)}
+  .resolved{font-family:var(--mono);font-size:12px;color:var(--ok);display:none;align-items:center;gap:7px}.resolved.show{display:flex}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--raised);border:1px solid var(--line);color:var(--text);padding:11px 16px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:.3s;z-index:50}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast svg{color:var(--ok)}
+
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr}
+    .sidebar{flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--line-soft);padding:8px 12px;overflow-x:auto}
+    .brand{padding:4px 6px}.brand .sub{display:none}.nav-stage,.side-foot{display:none}
+    .nav{flex-direction:row;gap:4px}.navitem .num{display:none}.navitem.active::before{display:none}.navitem span.t{display:none}
+    .sbody,.ivwrap,.work{grid-template-columns:1fr}
+    .slist,.iv-stage,.panel.map{border-right:none;border-bottom:1px solid var(--line-soft)}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark"><svg width="19" height="19" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#8E88F4" stroke-width="1.4"/><circle cx="10" cy="10" r="2" fill="#FF7A59"/><circle cx="10" cy="3" r="1.4" fill="#4FD1B0"/><circle cx="17" cy="10" r="1.4" fill="#E5A86E"/><circle cx="3" cy="10" r="1.4" fill="#DC8FB6"/></svg></div>
+      <div><h1>Atlas</h1><span class="sub">PROJECT INSIGHTS</span></div>
+    </div>
+    <div class="nav-stage">Pipeline</div>
+    <nav class="nav" id="nav">
+      <button class="navitem active" data-view="sessions"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18M3 12h18M3 19h18"/></svg><span class="t">Sessions</span><span class="num">3</span></button>
+      <button class="navitem" data-view="interview"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="t">Live interview</span></button>
+      <button class="navitem" data-view="workspace"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.6 7.7 11 16M16.4 7.7 13 16"/></svg><span class="t">Map &amp; analysis</span></button>
+    </nav>
+    <div class="side-foot"><span class="chip"><span class="dot"></span>K-12 individual recruiting</span></div>
+  </aside>
+
+  <div class="viewport">
+
+    <!-- ===================== SESSIONS ===================== -->
+    <section class="view active" id="view-sessions">
+      <div class="vhead">
+        <div class="vt"><h2>Sessions</h2><div class="vd">Interviews captured by Atlas. Select sessions to build a process map.</div></div>
+        <div class="sp"></div>
+        <button class="btn primary" id="new-interview"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>New interview</button>
+      </div>
+      <div class="sbody">
+        <div class="slist">
+          <div class="lhead"><span class="eyebrow">Captured · <span id="sess-count">3</span></span><span class="eyebrow" id="sel-count">0 selected</span></div>
+          <div id="session-list"></div>
+        </div>
+        <div class="sdetail" id="session-detail">
+          <div class="detail-empty">Select a session to read its transcript.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== INTERVIEW ===================== -->
+    <section class="view" id="view-interview">
+      <div class="vhead">
+        <div class="vt"><h2>Live interview</h2><div class="vd">Atlas asks, you answer by voice. Transcribed with Gemini Speech-to-Text.</div></div>
+      </div>
+      <div class="ivwrap">
+        <div class="iv-stage">
+          <div class="iv-setup">
+            <div class="who"><div class="avatar">DK</div><div><div style="font-size:14px;font-weight:500">Dana Kim</div><div class="mono" style="font-size:11px;color:var(--muted)">Admissions counselor</div></div></div>
+            <div class="qn" id="qcount">Question 1 of 6</div>
+          </div>
+          <div class="qcard">
+            <div class="qlabel">Atlas asks</div>
+            <div class="q" id="question">To start, what is your role and which team are you on?</div>
+          </div>
+          <div class="mic-zone">
+            <button class="mic" id="mic" aria-label="Record answer">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
+            </button>
+            <div class="mic-status" id="mic-status">Tap to answer</div>
+          </div>
+        </div>
+        <div class="iv-live">
+          <div class="lh"><span class="eyebrow">Transcript · building</span><span class="eyebrow mono" id="turn-count">0 turns</span></div>
+          <div class="iv-feed" id="iv-feed"></div>
+          <div class="live-line" id="live-line"></div>
+          <div class="iv-foot">
+            <button class="btn" id="end-session" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M5 12l5-5M5 12l5 5"/></svg>End &amp; save session</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== WORKSPACE ===================== -->
+    <section class="view" id="view-workspace">
+      <div class="vhead">
+        <div class="vt"><h2>Process map &amp; analysis</h2><div class="vd" id="ws-sub">Generate a map from your sessions, then run the analysis.</div></div>
+        <div class="sp"></div>
+        <button class="btn ghost" id="ws-reset" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Reset</button>
+        <button class="btn risk" id="run" style="display:none"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span class="rt">Run analysis</span></button>
+      </div>
+      <div class="work">
+        <section class="panel map" id="map">
+          <div class="phead">
+            <h3>Dependency map</h3>
+            <div class="legend">
+              <span><span class="lg" style="background:var(--c-init)"></span>Initiative</span>
+              <span><span class="lg" style="background:var(--c-proc)"></span>Process</span>
+              <span><span class="lg" style="background:var(--c-person)"></span>Person</span>
+              <span><span class="lg" style="background:var(--c-system)"></span>System</span>
+              <span><span class="lgline"></span>Risk</span>
+            </div>
+          </div>
+          <div class="map-empty" id="map-empty">No process map yet.<br>Go to Sessions, select interviews, and generate one.</div>
+          <svg class="graph" viewBox="0 0 720 560" id="graph" role="img" aria-label="Dependency map generated from interview transcripts." style="display:none"></svg>
+        </section>
+        <section class="panel insight" id="insight">
+          <div class="phead"><h3>Operational insight</h3></div>
+          <div class="empty" id="empty">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <div>Run the analysis to surface the operational insight across these sessions.</div>
+          </div>
+          <div class="card hero" id="hero">
+            <div class="badges"><span class="bdg risk">Crossover</span><span class="bdg neutral">High confidence</span></div>
+            <h3 class="ctitle">Two initiatives, one hidden dependency</h3>
+            <p class="cbody">Recruiting and the scholarship program both route every applicant through <b>one manual eligibility check</b>, owned by <b>Maria Lopez</b> alone on <b>one legacy spreadsheet</b>. Neither team sees the other's reliance. If she is out, both funnels stall.</p>
+            <div class="conf"><span class="lbl">Confidence</span><span class="meter"><i id="conf-bar"></i></span><span class="pct" id="conf-pct">0%</span></div>
+            <div class="action"><div><p class="k">Recommended action</p><p>Cross-train a backup and move the spreadsheet into a documented, owned step.</p></div></div>
+            <div class="stats"><div class="stat lead"><p class="sl">Time returned</p><p class="sv" id="stat-dollars">$0</p></div><div class="stat"><p class="sl">Throughput protected</p><p class="sv" id="stat-apps">0/wk</p></div></div>
+          </div>
+          <div class="card" id="review">
+            <div class="badges"><span class="bdg warn">Needs human review</span><span class="bdg neutral">Low confidence</span></div>
+            <h3 class="ctitle">Possible shared finance approver</h3>
+            <p class="cbody">Award determination and payment may route to the same approver, a second crossover. The transcripts hint at it but do not confirm it.</p>
+            <div class="action" style="margin-bottom:14px"><div><p class="k">What to check</p><p>Confirm with finance whether the two approval steps share one person.</p></div></div>
+            <div class="rev-actions" id="rev-actions"><button class="ba primary" data-r="confirm">Confirm dependency</button><button class="ba" data-r="dismiss">Dismiss</button></div>
+            <div class="resolved" id="resolved"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg><span id="resolved-t"></span></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+  </div>
+</div>
+<div class="toast" id="toast"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg><span id="toast-t"></span></div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var $ = function(id){return document.getElementById(id);};
+
+  /* ---------- data ---------- */
+  var sessions = [
+    {id:'s1', name:'James Carter', role:'Recruiting Manager', date:'Jun 18', dur:'4:12', initials:'JC', sel:true, turns:[
+      {s:'atlas',t:'Walk me through what happens when a new student lead comes in.'},
+      {s:'you',t:'Leads land in our recruiting CRM from web inquiries and school events. Tom and the counselors do the first application review there.'},
+      {s:'atlas',t:'And after the application is reviewed?'},
+      {s:'you',t:'It goes to eligibility verification before we can enroll anyone. That part is manual. We hand it off to Maria in enrollment.'},
+      {s:'atlas',t:'Is anyone besides Maria able to do that verification?'},
+      {s:'you',t:'Not really. It is her process. If she is out, recruiting basically waits.'}
+    ]},
+    {id:'s2', name:'Priya Nair', role:'Scholarship Lead', date:'Jun 18', dur:'3:48', initials:'PN', sel:true, turns:[
+      {s:'atlas',t:'How does a scholarship application move through your program?'},
+      {s:'you',t:'Applicants apply through the same CRM, and my team does the scholarship review. Then we verify eligibility before any award.'},
+      {s:'atlas',t:'Who handles the eligibility verification?'},
+      {s:'you',t:'We send it to the enrollment side. They run it manually against a spreadsheet. Then we do award determination.'},
+      {s:'atlas',t:'Does the recruiting team use the same step?'},
+      {s:'you',t:'I am not sure how their side works. That is separate from us.'}
+    ]},
+    {id:'s3', name:'Maria Lopez', role:'Enrollment Coordinator', date:'Jun 19', dur:'5:31', initials:'ML', sel:true, turns:[
+      {s:'atlas',t:'Describe what you handle day to day.'},
+      {s:'you',t:'I run eligibility verification. Every applicant passes through me before enrollment.'},
+      {s:'atlas',t:'Is that for one program or several?'},
+      {s:'you',t:'Both. I verify the recruiting applicants and the scholarship applicants. Same check, one spreadsheet I maintain.'},
+      {s:'atlas',t:'Does anyone else know how that spreadsheet works?'},
+      {s:'you',t:'Not really. When I took vacation, both recruiting enrollments and scholarship awards backed up until I returned.'}
+    ]}
+  ];
+
+  /* ---------- toast ---------- */
+  var toastT;
+  function toast(msg){ $('toast-t').textContent=msg; var el=$('toast'); el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){el.classList.remove('show');},2600); }
+
+  /* ---------- nav ---------- */
+  function showView(name){
+    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+    $('view-'+name).classList.add('active');
+    document.querySelectorAll('.navitem').forEach(function(n){n.classList.toggle('active', n.getAttribute('data-view')===name);});
+    window.scrollTo(0,0);
+  }
+  document.getElementById('nav').addEventListener('click', function(e){ var b=e.target.closest('[data-view]'); if(b) showView(b.getAttribute('data-view')); });
+  $('new-interview').addEventListener('click', function(){ showView('interview'); });
+
+  /* ---------- sessions list ---------- */
+  function renderSessions(){
+    var wrap=$('session-list'); wrap.innerHTML='';
+    sessions.forEach(function(s){
+      var b=document.createElement('button');
+      b.className='scard'+(s.sel?' sel':'');
+      b.innerHTML='<input type="checkbox" style="display:none">'+
+        '<div class="avatar">'+s.initials+'</div>'+
+        '<div class="si"><p class="sn">'+s.name+'</p><p class="sr">'+s.role+'</p><span class="pill">'+s.turns.length+' turns · transcript ready</span></div>'+
+        '<div class="smeta">'+s.date+'<br>'+s.dur+'</div>';
+      b.addEventListener('click', function(ev){ openDetail(s); });
+      wrap.appendChild(b);
+    });
+    $('sess-count').textContent=sessions.length;
+    $('sel-count').textContent=sessions.filter(function(s){return s.sel;}).length+' selected';
+  }
+  var activeDetail=null;
+  function openDetail(s){
+    activeDetail=s;
+    document.querySelectorAll('.scard').forEach(function(c){c.classList.remove('open');});
+    var d=$('session-detail');
+    var turns=s.turns.map(function(t){
+      return '<div class="turn '+(t.s==='atlas'?'atlas':'you')+'"><div class="who">'+(t.s==='atlas'?'Atlas':s.name)+'</div><div class="bubble">'+t.t+'</div></div>';
+    }).join('');
+    d.innerHTML='<div class="dh"><div class="avatar">'+s.initials+'</div><div><h3>'+s.name+'</h3></div></div>'+
+      '<div class="dsub">'+s.role+' · '+s.date+' · '+s.dur+' · '+s.turns.length+' turns</div>'+
+      '<div class="transcript">'+turns+'</div>'+
+      '<div class="gen-bar"><button class="btn primary" id="gen-map"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M7.6 7.7 11 16M16.4 7.7 13 16"/></svg>Generate process map</button><span class="note">from '+sessions.filter(function(x){return x.sel;}).length+' selected sessions</span></div>';
+    $('gen-map').addEventListener('click', generateMap);
+  }
+
+  /* ---------- interview ---------- */
+  var questions=[
+    {q:'To start, what is your role and which team are you on?', a:'I am Dana Kim, an admissions counselor on the K-12 individual recruiting team.'},
+    {q:'Walk me through what happens when a new lead comes to you.', a:'Leads come into our recruiting CRM from web inquiries and school events. I do the first application review right there.'},
+    {q:'Who or what do you hand off to next?', a:'Once I have reviewed an application, it goes to eligibility verification. We hand that off to Maria in enrollment.'},
+    {q:'Which systems are part of that step?', a:'It is manual. Maria checks each applicant against the requirements on a spreadsheet she maintains.'},
+    {q:'Where does the process slow down?', a:'Honestly the eligibility step is the bottleneck. Everything waits on Maria before we can enroll anyone.'},
+    {q:'If that step were unavailable for a week, what would stall?', a:'Recruiting would basically stop. Nothing moves to enrollment until eligibility is cleared.'}
+  ];
+  var qi=0, ivTurns=[], recording=false;
+  function setQuestion(){
+    $('question').textContent=questions[qi].q;
+    $('qcount').textContent='Question '+(qi+1)+' of '+questions.length;
+  }
+  function addIvTurn(s,t){
+    ivTurns.push({s:s,t:t});
+    var feed=$('iv-feed');
+    var d=document.createElement('div');
+    d.className='turn '+(s==='atlas'?'atlas':'you');
+    d.innerHTML='<div class="who">'+(s==='atlas'?'Atlas':'Dana Kim')+'</div><div class="bubble">'+t+'</div>';
+    feed.appendChild(d); feed.scrollTop=feed.scrollHeight;
+    $('turn-count').textContent=ivTurns.length+' turns';
+  }
+  // seed first atlas question into feed
+  function ivInit(){ if(ivTurns.length===0){ qi=0; setQuestion(); addIvTurn('atlas', questions[0].q); } }
+  $('mic').addEventListener('click', function(){
+    if(recording) return;
+    if(qi>=questions.length) return;
+    recording=true;
+    $('mic').classList.add('rec');
+    $('mic-status').innerHTML='<span class="stt">Listening</span> · Gemini Speech-to-Text';
+    var ans=questions[qi].a, words=ans.split(' '), k=0, live=$('live-line');
+    live.textContent='';
+    var step=function(){
+      if(k<words.length){
+        live.textContent=(live.textContent+' '+words[k]).trim();
+        k++;
+        setTimeout(step, reduce?0:55);
+      } else {
+        // commit
+        recording=false; $('mic').classList.remove('rec'); live.textContent='';
+        $('mic-status').textContent='Transcribed';
+        addIvTurn('you', ans);
+        qi++;
+        if(qi<questions.length){
+          setTimeout(function(){
+            setQuestion(); addIvTurn('atlas', questions[qi].q);
+            $('mic-status').textContent='Tap to answer';
+          }, reduce?0:500);
+        } else {
+          $('question').textContent='Interview complete. Save the session to add it to your library.';
+          $('qcount').textContent='6 of 6 · done';
+          $('mic-status').textContent='Interview complete';
+          $('end-session').disabled=false;
+        }
+      }
+    };
+    setTimeout(step, reduce?0:350);
+  });
+  $('end-session').addEventListener('click', function(){
+    var s={id:'s'+(sessions.length+1), name:'Dana Kim', role:'Admissions Counselor', date:'Jun 20', dur:'4:40', initials:'DK', sel:true, turns:ivTurns.slice()};
+    sessions.push(s);
+    renderSessions();
+    toast('Session saved · Dana Kim added to library');
+    // reset interview
+    ivTurns=[]; qi=0; $('iv-feed').innerHTML=''; $('turn-count').textContent='0 turns'; $('end-session').disabled=true; $('mic-status').textContent='Tap to answer';
+    ivInit();
+    showView('sessions');
+    openDetail(s);
+  });
+
+  /* ---------- graph (map) ---------- */
+  var NW=172, NH=52;
+  var nodes=[
+    {id:'rec',x:130,y:58,t:'init',l:'Recruiting',m:'Initiative'},
+    {id:'lead',x:130,y:152,t:'proc',l:'Lead intake',m:'Process'},
+    {id:'app',x:130,y:246,t:'proc',l:'Application review',m:'Process'},
+    {id:'sch',x:590,y:58,t:'init',l:'Scholarship & aid',m:'Initiative'},
+    {id:'srev',x:590,y:152,t:'proc',l:'Scholarship review',m:'Process'},
+    {id:'elig',x:360,y:256,t:'proc',l:'Eligibility',m:'Shared step',shared:true},
+    {id:'maria',x:262,y:378,t:'person',l:'Maria Lopez',m:'Coordinator',shared:true},
+    {id:'sheet',x:458,y:378,t:'system',l:'Eligibility sheet',m:'Legacy · 1 owner',shared:true},
+    {id:'enr',x:360,y:474,t:'proc',l:'Enrollment',m:'Process'},
+    {id:'pay',x:150,y:474,t:'proc',l:'Payment',m:'Process'},
+    {id:'awd',x:575,y:474,t:'proc',l:'Award decision',m:'Process'}
+  ];
+  var byId={}; nodes.forEach(function(n){byId[n.id]=n;});
+  var edges=[{a:'rec',b:'lead'},{a:'lead',b:'app'},{a:'sch',b:'srev'},{a:'elig',b:'enr'},{a:'enr',b:'pay'},{a:'enr',b:'awd'}];
+  var riskEdges=[{a:'app',b:'elig'},{a:'srev',b:'elig'},{a:'elig',b:'maria'},{a:'elig',b:'sheet'}];
+  var icons={
+    init:'<circle class="ic" cx="8" cy="8" r="6"/><circle class="fl" cx="8" cy="8" r="2"/>',
+    proc:'<rect class="ic" x="2" y="3.5" width="12" height="9" rx="2.5"/>',
+    person:'<circle class="ic" cx="8" cy="6" r="2.6"/><path class="ic" d="M3 14a5 5 0 0 1 10 0"/>',
+    system:'<ellipse class="ic" cx="8" cy="4.5" rx="5" ry="2"/><path class="ic" d="M3 4.5v7c0 1.1 2.2 2 5 2s5-.9 5-2v-7"/>'
+  };
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function pathD(a,b){
+    var p1=byId[a],p2=byId[b],dx=p2.x-p1.x,dy=p2.y-p1.y,sx=p1.x,sy=p1.y,ex=p2.x,ey=p2.y;
+    if(Math.abs(dy)>=Math.abs(dx)){sy=p1.y+(dy>0?NH/2:-NH/2);ey=p2.y+(dy>0?-NH/2:NH/2);}
+    else{sx=p1.x+(dx>0?NW/2:-NW/2);ex=p2.x+(dx>0?-NW/2:NW/2);}
+    var mx=(sx+ex)/2,my=(sy+ey)/2,c1x=Math.abs(dy)>=Math.abs(dx)?sx:mx,c1y=Math.abs(dy)>=Math.abs(dx)?my:sy;
+    return 'M'+sx+','+sy+' Q'+c1x+','+c1y+' '+mx+','+my+' T'+ex+','+ey;
+  }
+  function buildGraph(){
+    var h='';
+    edges.forEach(function(e){h+='<path class="edge" d="'+pathD(e.a,e.b)+'"/>';});
+    riskEdges.forEach(function(e){h+='<path class="edge risk" d="'+pathD(e.a,e.b)+'"/>';});
+    h+='<path class="risk-arc" d="M'+(byId.rec.x+NW/2-8)+','+(byId.rec.y+6)+' C 300,210 420,210 '+(byId.sch.x-NW/2+8)+','+(byId.sch.y+6)+'"/>';
+    h+='<text class="nm risk-tag" x="360" y="320" text-anchor="middle" fill="#FF7A59" font-size="10.5" letter-spacing=".08em">SHARED BY BOTH INITIATIVES</text>';
+    nodes.forEach(function(n){
+      var x=n.x-NW/2,y=n.y-NH/2;
+      h+='<g class="node t-'+n.t+(n.shared?' shared':'')+'" transform="translate('+x+','+y+')">';
+      if(n.shared) h+='<rect class="ring" x="-5" y="-5" width="'+(NW+10)+'" height="'+(NH+10)+'" rx="13"/>';
+      h+='<rect class="nbg" x="0" y="0" width="'+NW+'" height="'+NH+'" rx="11"/>';
+      h+='<rect class="acc" x="0" y="10" width="3.5" height="'+(NH-20)+'" rx="2"/>';
+      h+='<g transform="translate(16,'+(NH/2-8)+')">'+icons[n.t]+'</g>';
+      h+='<text class="nl" x="40" y="'+(NH/2-3)+'">'+esc(n.l)+'</text>';
+      h+='<text class="nm" x="40" y="'+(NH/2+14)+'">'+esc(n.m)+'</text>';
+      h+='</g>';
+    });
+    $('graph').innerHTML=h;
+  }
+
+  var mapBuilt=false;
+  function generateMap(){
+    buildGraph();
+    mapBuilt=true;
+    $('map-empty').style.display='none';
+    $('graph').style.display='block';
+    $('ws-sub').textContent='Map generated from '+sessions.filter(function(s){return s.sel;}).length+' sessions. Run the analysis to surface the insight.';
+    $('run').style.display='inline-flex';
+    showView('workspace');
+    toast('Process map generated from transcripts');
+  }
+
+  /* ---------- analysis (workspace) ---------- */
+  var map=$('map'),runBtn=$('run'),wsReset=$('ws-reset'),empty=$('empty'),hero=$('hero'),review=$('review'),runText=runBtn.querySelector('.rt');
+  function countUp(el,to,fmt,ms){ if(reduce){el.textContent=fmt(to);return;} var s=performance.now(); function tick(n){var p=Math.min((n-s)/ms,1),e=1-Math.pow(1-p,3);el.textContent=fmt(Math.round(to*e));if(p<1)requestAnimationFrame(tick);} requestAnimationFrame(tick); }
+  var usd=function(v){return '$'+v.toLocaleString('en-US');}, apps=function(v){return v+'/wk';};
+  var timers=[];
+  function T(fn,ms){timers.push(setTimeout(fn,reduce?0:ms));}
+  function runAnalysis(){
+    if(!mapBuilt) return;
+    timers.forEach(clearTimeout); timers=[];
+    runBtn.disabled=true; runText.textContent='Analyzing';
+    T(function(){ map.classList.add('on'); },150);
+    T(function(){
+      empty.style.display='none'; hero.classList.add('show');
+      $('conf-bar').style.width='94%';
+      countUp($('conf-pct'),94,function(v){return v+'%';},1000);
+      countUp($('stat-dollars'),34560,usd,1100);
+      countUp($('stat-apps'),120,apps,1100);
+    },800);
+    T(function(){ review.classList.add('show'); runText.textContent='Analysis complete'; wsReset.style.display='inline-flex'; },1400);
+  }
+  function resetAnalysis(){
+    timers.forEach(clearTimeout); timers=[];
+    map.classList.remove('on'); empty.style.display=''; hero.classList.remove('show'); review.classList.remove('show');
+    $('conf-bar').style.width='0'; $('conf-pct').textContent='0%'; $('stat-dollars').textContent='$0'; $('stat-apps').textContent='0/wk';
+    $('resolved').classList.remove('show'); $('rev-actions').style.display='';
+    runBtn.disabled=false; runText.textContent='Run analysis'; wsReset.style.display='none';
+  }
+  runBtn.addEventListener('click', runAnalysis);
+  wsReset.addEventListener('click', resetAnalysis);
+  $('rev-actions').addEventListener('click', function(e){
+    var b=e.target.closest('[data-r]'); if(!b) return;
+    var r=b.getAttribute('data-r');
+    $('rev-actions').style.display='none';
+    $('resolved-t').textContent = r==='confirm' ? 'Confirmed · queued as a second crossover' : 'Dismissed · no shared approver';
+    $('resolved').classList.add('show');
+  });
+
+  /* ---------- init ---------- */
+  renderSessions();
+  openDetail(sessions[0]);
+  ivInit();
+})();
+</script>
+</body>
+</html>

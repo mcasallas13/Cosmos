@@ -1,0 +1,122 @@
+{
+  "id": "session-1782442426597",
+  "participant": {
+    "name": "Cook",
+    "role": "",
+    "team": "HOme team"
+  },
+  "date": "2026-06-26",
+  "durationSec": 108,
+  "status": "draft",
+  "turns": [
+    {
+      "speaker": "atlas",
+      "text": "Before we start, what is your name and role?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Cook"
+    },
+    {
+      "speaker": "atlas",
+      "text": "And which team are you on?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Cook"
+    },
+    {
+      "speaker": "atlas",
+      "text": "And which team are you on?"
+    },
+    {
+      "speaker": "participant",
+      "text": "HOme team"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Walk me through what happens when work first comes to you."
+    },
+    {
+      "speaker": "participant",
+      "text": "HOme team"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Walk me through what happens when work first comes to you."
+    },
+    {
+      "speaker": "participant",
+      "text": "I help prep the ingredients"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Who or what do you hand off to next?"
+    },
+    {
+      "speaker": "participant",
+      "text": "I help prep the ingredients"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Who or what do you hand off to next?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Give the receipe to my wife"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Which systems or tools are part of that?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Give the receipe to my wife"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Which systems or tools are part of that?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Coock top"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Where does the process slow down or get stuck?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Coock top"
+    },
+    {
+      "speaker": "atlas",
+      "text": "Where does the process slow down or get stuck?"
+    },
+    {
+      "speaker": "participant",
+      "text": "When we have too many things to try to time at the same time"
+    },
+    {
+      "speaker": "atlas",
+      "text": "If you were out for a week, what would stall?"
+    },
+    {
+      "speaker": "participant",
+      "text": "When we have too many things to try to time at the same time"
+    },
+    {
+      "speaker": "atlas",
+      "text": "If you were out for a week, what would stall?"
+    },
+    {
+      "speaker": "participant",
+      "text": "Everything"
+    },
+    {
+      "speaker": "participant",
+      "text": "Everything"
+    }
+  ],
+  "projectId": "proj-1782442420021"
+}

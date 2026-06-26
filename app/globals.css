@@ -1,0 +1,220 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Shared design tokens (entity colors, risk, fonts) ───────────────────── */
+:root {
+  --font-sans: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Entity colors — match Atlas reference */
+  --c-init: #8E88F4;
+  --c-proc: #4FD1B0;
+  --c-person: #E5A86E;
+  --c-system: #DC8FB6;
+
+  /* Risk accents */
+  --risk: #FF7A59;
+  --risk-strong: #FF5A3C;
+  --risk-soft: #3a2236;
+
+  /* Map surfaces (dark in every theme — the graph reads as a space viz) */
+  --map-bg: #0E1320;
+  --map-node: #1B2438;
+  --map-node-line: #2A3550;
+  --map-line: #2A3550;
+  --map-text: #E9EDF6;
+  --map-muted: #97A3BC;
+}
+
+/* ── Theme CSS variables ─────────────────────────────────────────────────── */
+:root,
+html[data-theme="cosmos"] {
+  --bg: #0E1320;
+  --bg-gradient:
+    radial-gradient(120% 80% at 50% -10%, rgba(142, 136, 244, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 85% 20%, rgba(79, 209, 176, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 12% 90%, rgba(220, 143, 182, 0.05) 0%, transparent 45%);
+  --surface: #151D2E;
+  --border: #2A3550;
+  --topbar: #131B2B;
+  --t1: #E9EDF6;
+  --t2: #97A3BC;
+  --t3: #647187;
+  --t4: #4f5b72;
+  --t5: #3a4458;
+  --t6: #2A3550;
+  --accent: #8E88F4;
+  --accent-s: #b3aef8;
+  --accent-bg: #1f2440;
+  --accent-br: #3b3a73;
+  --badge-bg: #212C44;
+  --badge-tx: #b3aef8;
+  --act-bg: #0E1320;
+  --act-br: #2A3550;
+  --act-tx: #4FD1B0;
+  --fin-bg: #14211c;
+  --fin-br: #2c5046;
+  --fin-h: #4FD1B0;
+  --fin-s: #6f9c90;
+  --zero-bg: #1B2438;
+  --zero-br: #2A3550;
+  --zero-tx: #647187;
+  --rev-bg: #2a2113;
+  --rev-br: #6b5320;
+  --rev-tx: #E5A86E;
+}
+
+html[data-theme="dark"] {
+  --bg: #0d1117;
+  --bg-gradient: none;
+  --surface: #161b22;
+  --border: #30363d;
+  --topbar: #010409;
+  --t1: #e6edf3;
+  --t2: #8b949e;
+  --t3: #6e7781;
+  --t4: #484f58;
+  --t5: #30363d;
+  --t6: #21262d;
+  --accent: #7c3aed;
+  --accent-s: #a78bfa;
+  --accent-bg: #1e0d4a;
+  --accent-br: #3730a3;
+  --badge-bg: #1e1b4b;
+  --badge-tx: #a78bfa;
+  --act-bg: #060c1a;
+  --act-br: #164e63;
+  --act-tx: #67e8f9;
+  --fin-bg: #071209;
+  --fin-br: #14532d;
+  --fin-h: #86efac;
+  --fin-s: #166534;
+  --zero-bg: #161b22;
+  --zero-br: #30363d;
+  --zero-tx: #484f58;
+  --rev-bg: #2d1b0e;
+  --rev-br: #c2410c;
+  --rev-tx: #fed7aa;
+}
+
+html[data-theme="light"] {
+  --bg: #f6f8fa;
+  --bg-gradient: none;
+  --surface: #ffffff;
+  --border: #d0d7de;
+  --topbar: #ffffff;
+  --t1: #1f2328;
+  --t2: #57606a;
+  --t3: #6e7781;
+  --t4: #8c959f;
+  --t5: #b1bac4;
+  --t6: #d0d7de;
+  --accent: #7c3aed;
+  --accent-s: #6d28d9;
+  --accent-bg: #ede9fe;
+  --accent-br: #7c3aed;
+  --badge-bg: #ede9fe;
+  --badge-tx: #6d28d9;
+  --act-bg: #ecfeff;
+  --act-br: #06b6d4;
+  --act-tx: #0e7490;
+  --fin-bg: #f0fdf4;
+  --fin-br: #22c55e;
+  --fin-h: #15803d;
+  --fin-s: #166534;
+  --zero-bg: #f8fafc;
+  --zero-br: #d0d7de;
+  --zero-tx: #94a3b8;
+  --rev-bg: #fff7ed;
+  --rev-br: #ea580c;
+  --rev-tx: #9a3412;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  background-image: var(--bg-gradient);
+  color: var(--t1);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: var(--font-mono); }
+
+/* ── Map node highlight (shared / crossover entities) ─────────────────────── */
+@keyframes risk-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(255, 122, 89, 0.55),
+      0 0 18px 2px rgba(255, 122, 89, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(255, 122, 89, 0.12),
+      0 0 28px 6px rgba(255, 122, 89, 0.30);
+  }
+}
+
+.atlas-node-highlight .atlas-card {
+  animation: risk-pulse 1.9s ease-in-out infinite;
+  border-color: var(--risk) !important;
+}
+
+.atlas-node-dim {
+  opacity: 0.28;
+  transition: opacity 0.5s ease;
+}
+
+/* Animated dash flow on active risk edges */
+.react-flow__edge.atlas-risk-edge .react-flow__edge-path {
+  stroke: var(--risk);
+  stroke-width: 2.4;
+  stroke-dasharray: 6 6;
+  animation: dashflow 0.9s linear infinite;
+}
+@keyframes dashflow { to { stroke-dashoffset: -24; } }
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes thinkBounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.35; }
+  40%           { transform: scale(1.2); opacity: 1; }
+}
+
+@keyframes wave {
+  0%, 100% { height: 6px; }
+  50%      { height: 22px; }
+}
+
+/* ── COSMOS shimmer title ────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.cosmos-title {
+  background: linear-gradient(90deg,
+    #a78bfa 0%, #22d3ee 40%, #a78bfa 60%, #e879f9 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 6s linear infinite;
+}
+
+/* ── Sidebar smooth width transition ─────────────────────────────────────── */
+.sidebar-panel {
+  transition: width 0.22s ease;
+  overflow: hidden;
+}

@@ -1,0 +1,22 @@
+{
+  "id": "insight-eligibility-crossover",
+  "type": "crossover",
+  "title": "Two initiatives depend on one person and one spreadsheet for eligibility verification",
+  "entitiesInvolved": [
+    "init-recruiting",
+    "init-scholarship",
+    "proc-eligibility",
+    "person-maria",
+    "sys-eligibility-sheet"
+  ],
+  "explanation": "The Individual Recruiting Funnel and the Scholarship and Financial Aid Program both route every applicant through the same manual Eligibility Verification step, owned solely by Maria Lopez and run on one legacy spreadsheet she maintains. Neither initiative's leader sees the other's dependency, because each only described their own funnel. If Maria is unavailable, both funnels stall at the same point, so a single absence creates concentration risk across two initiatives at once. This was confirmed in the conversations: recruiting waits when Maria is out, and scholarship awards backed up during her vacation.",
+  "recommendedAction": "Cross-train at least one backup on eligibility verification, and move the spreadsheet logic into a documented, templated process or the enrollment system, removing the single point of failure that spans both initiatives.",
+  "financialImpact": {
+    "headline": "Cross-training a backup and templating the eligibility step removes a single point of failure spanning two initiatives, returns about 16 hours per week (about $34K per year), and protects roughly 120 applications per week of enrollment throughput that today depends on one person.",
+    "value": 34560,
+    "unit": "USD/year",
+    "basis": "120 applications/week x 8 minutes manual review = 16 hours/week; 16 hours x 48 weeks x $45/hour fully loaded is about $34,560/year. Inputs are placeholders pending FP&A confirmation."
+  },
+  "confidence": "high",
+  "needsHumanReview": false
+}
