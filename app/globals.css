@@ -4,6 +4,15 @@
   padding: 0;
 }
 
+/* Visible keyboard focus for all interactive elements (mouse clicks stay clean
+   via :focus-visible). Accessibility: nav, cards, toggles, and modal controls
+   are all keyboard-reachable. */
+:focus-visible {
+  outline: 2px solid var(--accent, #7c83ff);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* ── Shared design tokens (entity colors, risk, fonts) ───────────────────── */
 :root {
   --font-sans: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -217,4 +226,26 @@ html, body {
 .sidebar-panel {
   transition: width 0.22s ease;
   overflow: hidden;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Respect the OS "reduce motion" preference: drop the looping/decorative
+   animations (risk pulse, edge dash-flow, spinners, shimmer) and collapse
+   transitions to near-instant. Highlight state still reads via color + border. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .atlas-node-highlight .atlas-card {
+    animation: none !important;
+  }
+  .react-flow__edge.atlas-risk-edge .react-flow__edge-path {
+    animation: none !important;
+    stroke-dasharray: 6 6;
+  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { Fragment, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { Analysis, Graph, Insight, Project, Session } from "@/lib/types";
 import { K12_PROJECT_ID, deriveProjectStatus, isProtectedProject, sessionsForProject } from "@/lib/projects";
 import DependencyMap from "@/components/DependencyMap";
@@ -102,6 +102,49 @@ function IngestOverlay() {
   );
 }
 
+// Full-pane failure state for a map generation that produced no graph (e.g. a
+// first live extract that failed). Offers a retry and, for the prepared K-12
+// demo, a one-click fallback to the canonical graph so the run never dead-ends.
+function MapErrorState({
+  message, onRetry, onUsePrepared,
+}: { message: string; onRetry: () => void; onUsePrepared?: () => void }) {
+  return (
+    <div style={{ height: "100%", display: "grid", placeItems: "center", textAlign: "center", padding: 40 }}>
+      <div style={{ maxWidth: 340 }}>
+        <div style={{
+          width: 40, height: 40, margin: "0 auto 14px", borderRadius: "50%",
+          display: "grid", placeItems: "center",
+          background: DANGER_BG, border: `1px solid ${DANGER_BR}`, color: DANGER, fontSize: 20,
+        }}>
+          !
+        </div>
+        <div style={{ fontSize: 14, color: "var(--t2)", marginBottom: 6 }}>Map generation failed</div>
+        <div style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--t4)", marginBottom: 18 }}>
+          {message}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+          <button onClick={onRetry} style={{
+            background: "var(--accent)", border: "none", borderRadius: 9,
+            color: "#fff", fontSize: 13, fontWeight: 600, padding: "8px 16px",
+            cursor: "pointer", fontFamily: "inherit",
+          }}>
+            Retry generation
+          </button>
+          {onUsePrepared && (
+            <button onClick={onUsePrepared} style={{
+              background: "transparent", border: "1px solid var(--border)", borderRadius: 9,
+              color: "var(--t3)", fontSize: 13, fontWeight: 500, padding: "8px 16px",
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+              Use prepared map
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Theme toggle ────────────────────────────────────────────────────────────
 const THEMES: Array<{ id: Theme; icon: string; label: string }> = [
   { id: "cosmos", icon: "🌌", label: "Cosmos" },
@@ -136,15 +179,25 @@ function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: (t: Theme) =
 }
 
 // ── Live toggle ─────────────────────────────────────────────────────────────
+// Close a dialog on the Escape key, so modals are keyboard-dismissable.
+function useEscapeKey(onEscape: () => void) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onEscape(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onEscape]);
+}
+
 function LiveToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ fontSize: 10, color: "var(--t6)" }}>Live</span>
-      <div
-        role="switch" aria-checked={on}
+      <button
+        type="button"
+        role="switch" aria-checked={on} aria-label="Live mode"
         onClick={() => onChange(!on)}
         style={{
-          width: 32, height: 17, borderRadius: 9,
+          width: 32, height: 17, borderRadius: 9, padding: 0,
           background: on ? "var(--accent)" : "var(--bg)",
           border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
           position: "relative", cursor: "pointer",
@@ -157,7 +210,7 @@ function LiveToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => v
           background: on ? "#fff" : "var(--t4)",
           transition: "left 0.18s",
         }} />
-      </div>
+      </button>
       {on && <span style={{ fontSize: 9, color: "var(--accent)", fontWeight: 700, letterSpacing: "0.08em" }}>LIVE</span>}
     </div>
   );
@@ -396,7 +449,29 @@ function SessionsView({
             </span>
           </div>
 
-          {sessions.map((s) => {
+          {sessions.length === 0 ? (
+            <div style={{
+              border: "1px dashed var(--border)", borderRadius: 14,
+              padding: "30px 22px", textAlign: "center", marginTop: 8,
+            }}>
+              <span style={{
+                width: 44, height: 44, margin: "0 auto 14px", borderRadius: "50%",
+                display: "grid", placeItems: "center",
+                background: "var(--badge-bg)", color: "var(--accent-s)",
+              }}>
+                <MicGlyph />
+              </span>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "var(--t1)", margin: "0 0 6px" }}>
+                No sessions yet
+              </p>
+              <p style={{ fontSize: 12.5, color: "var(--t3)", lineHeight: 1.6, margin: "0 0 18px" }}>
+                Capture an SME interview to start mapping this process. You need at least one session before you can generate a map.
+              </p>
+              <button onClick={onNewInterview} style={{ ...primaryBtnStyle, margin: "0 auto" }}>
+                <MicGlyph /> Capture first interview
+              </button>
+            </div>
+          ) : sessions.map((s) => {
             const sel = selectedIds.has(s.id);
             const isOpen = s.id === openId;
             const protectedSeed = s.id.startsWith("seed-");
@@ -404,7 +479,12 @@ function SessionsView({
             return (
               <div
                 key={s.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isOpen}
+                aria-label={`Open transcript for ${s.participant.name}`}
                 onClick={() => setOpenId(s.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(s.id); } }}
                 style={{
                   display: "flex", alignItems: "center", gap: 12,
                   width: "100%", padding: "12px 13px", marginBottom: 10,
@@ -615,6 +695,67 @@ const PROJECT_STATUS_STYLE: Record<Project["status"], { bg: string; color: strin
   analyzed: { bg: "rgba(79,209,176,0.14)", color: "var(--c-proc)", label: "Analyzed" },
 };
 
+// ── Flow stepper ────────────────────────────────────────────────────────────
+// Makes the four presenter-paced beats visible and self-explanatory so the demo
+// no longer relies on the presenter remembering a hidden sequence. Each step is
+// clickable; the first incomplete step is highlighted as the next action.
+type FlowStep = { label: string; hint: string; done: boolean; view: View };
+
+function FlowStepper({ steps, current, onGo }: {
+  steps: FlowStep[];
+  current: number; // index of the next actionable step, or -1 when all done
+  onGo: (v: View) => void;
+}) {
+  return (
+    <nav
+      aria-label="Discovery flow"
+      style={{
+        display: "flex", alignItems: "center", gap: 2,
+        padding: "0 18px", height: 46, flexShrink: 0,
+        borderBottom: "1px solid var(--border)", background: "var(--surface)",
+        overflowX: "auto",
+      }}
+    >
+      {steps.map((s, i) => {
+        const isCurrent = i === current;
+        const state: "done" | "active" | "todo" = s.done ? "done" : isCurrent ? "active" : "todo";
+        const color = state === "done" ? "var(--c-proc)" : state === "active" ? "var(--accent)" : "var(--t4)";
+        const circleBg = state === "done" ? "rgba(79,209,176,0.16)" : state === "active" ? "var(--accent-bg)" : "var(--badge-bg)";
+        return (
+          <Fragment key={s.label}>
+            {i > 0 && <span aria-hidden style={{ width: 22, height: 1, background: "var(--border)", flexShrink: 0 }} />}
+            <button
+              onClick={() => onGo(s.view)}
+              aria-current={isCurrent ? "step" : undefined}
+              title={s.hint}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: "inherit", padding: "6px 8px", borderRadius: 8,
+                color, flexShrink: 0, opacity: state === "todo" ? 0.75 : 1,
+              }}
+            >
+              <span style={{
+                width: 21, height: 21, borderRadius: "50%", flexShrink: 0,
+                display: "grid", placeItems: "center",
+                fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700,
+                background: circleBg, color,
+                border: isCurrent ? `1px solid ${color}` : "1px solid transparent",
+                boxShadow: isCurrent ? "0 0 0 3px var(--accent-bg)" : "none",
+              }}>
+                {s.done
+                  ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  : i + 1}
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: isCurrent ? 700 : 500, whiteSpace: "nowrap" }}>{s.label}</span>
+            </button>
+          </Fragment>
+        );
+      })}
+    </nav>
+  );
+}
+
 function ProjectStatusBadge({ status }: { status: Project["status"] }) {
   const s = PROJECT_STATUS_STYLE[status];
   return (
@@ -649,7 +790,7 @@ function CheckDot({ on, label }: { on: boolean; label: string }) {
 }
 
 // ── Project switcher (top bar dropdown) ─────────────────────────────────────
-type ProjectOverview = { project: Project; sessionCount: number; status: Project["status"]; lastUpdated: string };
+type ProjectOverview = { project: Project; sessionCount: number; status: Project["status"]; lastUpdated: string; mapDone: boolean; analysisDone: boolean };
 
 function ProjectSwitcher({
   overviews,
@@ -790,6 +931,7 @@ function NewProcessModal({
   const [lineOfBusiness, setLineOfBusiness] = useState("");
   const [description, setDescription] = useState("");
   const canCreate = name.trim().length > 0;
+  useEscapeKey(onClose);
 
   const labelStyle: React.CSSProperties = {
     fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em",
@@ -811,6 +953,7 @@ function NewProcessModal({
       }}
     >
       <div
+        role="dialog" aria-modal="true" aria-labelledby="new-process-title"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%", maxWidth: 440, background: "var(--surface)",
@@ -819,7 +962,7 @@ function NewProcessModal({
         }}
       >
         <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--border)" }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "var(--t1)" }}>New process</h2>
+          <h2 id="new-process-title" style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "var(--t1)" }}>New process</h2>
           <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--t3)" }}>
             Create a workspace to capture sessions, build its map, and run analysis.
           </p>
@@ -886,6 +1029,7 @@ function ConfirmDeleteModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  useEscapeKey(onCancel);
   return (
     <div
       onClick={onCancel}
@@ -896,6 +1040,7 @@ function ConfirmDeleteModal({
       }}
     >
       <div
+        role="dialog" aria-modal="true" aria-label={title}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%", maxWidth: 420, background: "var(--surface)",
@@ -967,7 +1112,7 @@ function ProcessesView({
 
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-          {overviews.map(({ project, sessionCount, status, lastUpdated }) => {
+          {overviews.map(({ project, sessionCount, status, lastUpdated, mapDone, analysisDone }) => {
             const isActive = project.id === activeId;
             const protectedProject = isProtectedProject(project.id);
             const showDelete = hoveredId === project.id;
@@ -1028,8 +1173,8 @@ function ProcessesView({
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <CheckDot on={!!project.graph} label="Map" />
-                    <CheckDot on={!!project.analysis} label="Analysis" />
+                    <CheckDot on={mapDone} label="Map" />
+                    <CheckDot on={analysisDone} label="Analysis" />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--t4)", borderTop: "1px solid var(--border)", paddingTop: 10 }}>
                     <span>{sessionCount} session{sessionCount !== 1 ? "s" : ""}</span>
@@ -1077,7 +1222,7 @@ export default function AtlasApp({
     id: K12_PROJECT_ID,
     name: "K-12 Individual Recruiting",
     lineOfBusiness: "K-12 individual recruiting",
-    description: "Prepared demo workspace — three SME sessions, a shared-dependency map, and the $34,560/yr single-point-of-failure insight.",
+    description: "Three SME interviews across two recruiting initiatives. Generate the process map to surface where they secretly overlap.",
     createdAt: "2026-06-20T09:00:00.000Z",
     sessionIds: seedSessions.map((s) => s.id),
     graph,                    // canonical prepared graph  → overview: Map ✓
@@ -1103,9 +1248,28 @@ export default function AtlasApp({
   const [processSummary, setProcessSummary] = useState<string | null>(null);
   const [entityAttributes, setEntityAttributes] = useState<Record<string, Record<string, string>> | null>(null);
   const revealedRef = useRef<Set<string>>(new Set());
+  // Which projects have had their map / analysis *revealed* this session. Drives
+  // the Processes overview so the prepared K-12 workspace presents as a launch
+  // pad ("3 sessions, ready to map") — not as already-solved — until the
+  // presenter actually runs the beats. The $34K reveal is never pre-spoiled.
+  const [revealedMap, setRevealedMap] = useState<Set<string>>(new Set());
+  const [revealedAnalysis, setRevealedAnalysis] = useState<Set<string>>(new Set());
+  const markMapRevealed = useCallback((id: string) => {
+    revealedRef.current.add(id);
+    setRevealedMap((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+  const markAnalysisRevealed = useCallback((id: string) => {
+    setRevealedAnalysis((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Map-generation failure (live extract). Kept separate from the analysis
+  // `error` so a failed map build surfaces on the map pane with its own retry —
+  // never a blank dead-end. lastChosenRef remembers the sessions used so the
+  // presenter can retry the exact same generation.
+  const [mapError, setMapError] = useState<string | null>(null);
+  const lastChosenRef = useRef<Session[]>([]);
   const [liveMode, setLiveMode] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [generatingMap, setGeneratingMap] = useState(false);
@@ -1151,13 +1315,25 @@ export default function AtlasApp({
 
   const overviews = useMemo<ProjectOverview[]>(() => projects.map((p) => {
     const sessions = sessionsForProject(p.id, savedSessions, seedSessions);
+    // The prepared K-12 workspace always carries a baked graph + analysis, but
+    // we gate them behind the live reveal so the overview never spoils the demo;
+    // user projects show their real persisted pipeline state.
+    const isK12 = p.id === K12_PROJECT_ID;
+    const mapDone = isK12 ? revealedMap.has(p.id) : !!p.graph;
+    const analysisDone = isK12 ? revealedAnalysis.has(p.id) : !!p.analysis;
     return {
       project: p,
       sessionCount: sessions.length,
-      status: deriveProjectStatus({ sessionCount: sessions.length, graph: p.graph, analysis: p.analysis }),
+      mapDone,
+      analysisDone,
+      status: deriveProjectStatus({
+        sessionCount: sessions.length,
+        graph: mapDone ? p.graph : undefined,
+        analysis: analysisDone ? p.analysis : undefined,
+      }),
       lastUpdated: lastUpdatedLabel(p.createdAt, sessions),
     };
-  }), [projects, savedSessions, seedSessions]);
+  }), [projects, savedSessions, seedSessions, revealedMap, revealedAnalysis]);
 
   // Merge analysis-time attributes (e.g. hoursPerWeek) into the displayed graph
   // so node detail cards show them. Prepared data already carries them in seed.
@@ -1220,6 +1396,7 @@ export default function AtlasApp({
     }
     setLoading(false);
     setError(null);
+    setMapError(null);
   }, [projects, blankDisplay]);
 
   const selectProject = useCallback((id: string) => {
@@ -1307,10 +1484,10 @@ export default function AtlasApp({
   const onGenerateMap = useCallback(async (chosen: Session[]) => {
     clearTimers();
     setView("map");
-    blankDisplay();
     setError(null);
+    setMapError(null);
     setMapStale(false);
-    setIngesting(true);
+    lastChosenRef.current = chosen;
 
     const project = activeProject;
     const isPrepared = project.id === K12_PROJECT_ID;
@@ -1318,16 +1495,24 @@ export default function AtlasApp({
     // Prepared K-12 (demo-safe) path: reveal the canonical graph with zero
     // network, zero Gemini, zero mic dependency.
     if (isPrepared && !liveMode) {
+      blankDisplay();
+      setIngesting(true);
       const t = setTimeout(() => {
         setIngesting(false);
         setShownGraph(graph);
-        revealedRef.current.add(project.id);
+        markMapRevealed(project.id);
       }, INGEST_DURATION);
       timers.current = [t];
       return;
     }
 
-    // Live path: extract a graph from the chosen sessions' transcripts.
+    // Live path: extract a graph from the chosen sessions' transcripts. Keep any
+    // previously shown map visible under the overlay — only the insights are
+    // cleared — so a failed regeneration never wipes the screen.
+    setInsights(null);
+    setProcessSummary(null);
+    setEntityAttributes(null);
+    setIngesting(true);
     setGeneratingMap(true);
     try {
       const transcripts = chosen.map(sessionToTranscript);
@@ -1341,7 +1526,7 @@ export default function AtlasApp({
       const g = data as Graph;
       setIngesting(false);
       setShownGraph(g);
-      revealedRef.current.add(project.id);
+      markMapRevealed(project.id);
       if (!isPrepared) {
         const sessionIds = chosen.map((s) => s.id);
         const status = deriveProjectStatus({ sessionCount: chosen.length, graph: g });
@@ -1351,14 +1536,32 @@ export default function AtlasApp({
     } catch (e) {
       setIngesting(false);
       if (isPrepared) {
-        setShownGraph(graph); // never dead-end the demo
-        revealedRef.current.add(project.id);
+        // The hero demo must never dead-end: fall back to the canonical graph.
+        setShownGraph(graph);
+        markMapRevealed(project.id);
       }
-      setError(e instanceof Error ? e.message : "Generation failed");
+      // Surface on the map pane (with retry / prepared fallback), keeping any
+      // prior map in place rather than blanking it.
+      setMapError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGeneratingMap(false);
     }
-  }, [clearTimers, blankDisplay, activeProject, liveMode, graph, updateUserProject, persistProject]);
+  }, [clearTimers, blankDisplay, activeProject, liveMode, graph, updateUserProject, persistProject, markMapRevealed]);
+
+  // Retry the last map generation with the same chosen sessions.
+  const retryGenerateMap = useCallback(() => {
+    void onGenerateMap(lastChosenRef.current);
+  }, [onGenerateMap]);
+
+  // Demo fallback: reveal the canonical prepared graph for the active project
+  // (only meaningful for K-12, which has one) when live generation failed.
+  const usePreparedMapFallback = useCallback(() => {
+    clearTimers();
+    setMapError(null);
+    setIngesting(false);
+    setShownGraph(graph);
+    markMapRevealed(activeProject.id);
+  }, [clearTimers, graph, activeProject.id, markMapRevealed]);
 
   // Live analysis beat for a real graph (live K-12 or any user project).
   const analyzeGraph = useCallback(async (g: Graph, project: Project) => {
@@ -1381,6 +1584,7 @@ export default function AtlasApp({
       setProcessSummary(analysis.processSummary);
       setInsights(analysis.insights);
       setEntityAttributes(analysis.entityAttributes ?? null);
+      markAnalysisRevealed(project.id);
       if (project.id !== K12_PROJECT_ID) {
         updateUserProject(project.id, { analysis, status: "analyzed" });
         persistProject({ ...project, graph: g, analysis, status: "analyzed" });
@@ -1390,7 +1594,7 @@ export default function AtlasApp({
     } finally {
       setLoading(false);
     }
-  }, [clearTimers, updateUserProject, persistProject]);
+  }, [clearTimers, updateUserProject, persistProject, markAnalysisRevealed]);
 
   // Prepared (offline) analysis beat — trust → insight → HITL flag reveal.
   const runPrepared = useCallback(() => {
@@ -1406,12 +1610,13 @@ export default function AtlasApp({
       setLoading(false);
       setProcessSummary(preparedProcessSummary);
       setInsights([preparedInsights[0]]);
+      markAnalysisRevealed(activeProjectId);
     }, 850);
     const t2 = setTimeout(() => {
       setInsights(preparedInsights);
     }, 2050);
     timers.current = [t1, t2];
-  }, [preparedInsights, preparedProcessSummary, clearTimers]);
+  }, [preparedInsights, preparedProcessSummary, clearTimers, markAnalysisRevealed, activeProjectId]);
 
   const runAnalysis = useCallback(() => {
     if (!shownGraph) return; // a map must be generated first
@@ -1421,6 +1626,21 @@ export default function AtlasApp({
   }, [shownGraph, activeProject, liveMode, runPrepared, analyzeGraph]);
 
   const highlightedIds = insights?.flatMap((i) => i.entitiesInvolved) ?? [];
+
+  // Discovery flow state → drives the persistent stepper. Each beat is "done"
+  // once its artifact exists for the active project's current reveal.
+  const hasSessions = activeSessions.length > 0;
+  const hasMap = !!shownGraph;
+  const hasInsight = !!insights && insights.length > 0;
+  const hasReview = !!insights && insights.length > 1; // the HITL flag is appended
+  const flowSteps: FlowStep[] = [
+    { label: "Interviews", hint: "Capture or open SME sessions", done: hasSessions, view: "sessions" },
+    { label: "Process map", hint: "Generate the dependency map from sessions", done: hasMap, view: "map" },
+    { label: "Insight", hint: "Run analysis to surface the shared dependency", done: hasInsight, view: "map" },
+    { label: "Human review", hint: "Confirm or dismiss the flagged finding", done: hasReview, view: "map" },
+  ];
+  const currentStep = flowSteps.findIndex((s) => !s.done);
+  const showStepper = view !== "processes";
 
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -1483,6 +1703,11 @@ export default function AtlasApp({
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
         <NavRail view={view} onNavigate={navigate} sessionCount={activeSessions.length} activeProject={activeProject} />
+
+        {/* Content column: persistent flow stepper + active view */}
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, overflow: "hidden" }}>
+        {showStepper && <FlowStepper steps={flowSteps} current={currentStep} onGo={navigate} />}
+        <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
 
         {view === "processes" && (
           <ProcessesView
@@ -1547,6 +1772,12 @@ export default function AtlasApp({
               <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
                 {mapGraph ? (
                   <DependencyMap graph={mapGraph} highlightedIds={highlightedIds} />
+                ) : mapError ? (
+                  <MapErrorState
+                    message={mapError}
+                    onRetry={retryGenerateMap}
+                    onUsePrepared={activeProject.id === K12_PROJECT_ID ? usePreparedMapFallback : undefined}
+                  />
                 ) : (
                   <div style={{ height: "100%", display: "grid", placeItems: "center", textAlign: "center", padding: 40 }}>
                     <div style={{ maxWidth: 300, color: "var(--t4)" }}>
@@ -1555,6 +1786,34 @@ export default function AtlasApp({
                         Open <strong style={{ color: "var(--t2)" }}>Sessions</strong> for {activeProject.name} and generate a process map from its captured sessions.
                       </div>
                     </div>
+                  </div>
+                )}
+                {/* Non-blocking banner when a regeneration failed but a prior map
+                    is still on screen — keeps the demo recoverable. */}
+                {mapGraph && mapError && (
+                  <div style={{
+                    position: "absolute", top: 12, left: 12, right: 12, zIndex: 5,
+                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                    padding: "10px 14px", borderRadius: 10,
+                    background: DANGER_BG, border: `1px solid ${DANGER_BR}`,
+                    color: DANGER, fontSize: 12,
+                  }}>
+                    <span style={{ flex: 1, minWidth: 160 }}>
+                      Map generation failed — showing the previous map. {mapError}
+                    </span>
+                    <button onClick={retryGenerateMap} style={{
+                      background: "transparent", border: `1px solid ${DANGER_BR}`,
+                      borderRadius: 8, color: DANGER, fontSize: 12, fontWeight: 600,
+                      padding: "5px 12px", cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      Retry
+                    </button>
+                    <button onClick={() => setMapError(null)} title="Dismiss" style={{
+                      background: "transparent", border: "none", color: DANGER,
+                      fontSize: 14, cursor: "pointer", lineHeight: 1, padding: "2px 6px",
+                    }}>
+                      ✕
+                    </button>
                   </div>
                 )}
                 {ingesting && <IngestOverlay />}
@@ -1578,11 +1837,17 @@ export default function AtlasApp({
                   loading={loading}
                   error={error}
                   onAnalyze={runAnalysis}
+                  entities={shownGraph?.entities}
+                  hasMap={!!shownGraph}
+                  onGoToSessions={() => navigate("sessions")}
                 />
               </div>
             </section>
           </>
         )}
+
+        </div>
+        </div>
 
       </div>
 

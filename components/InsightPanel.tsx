@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Insight } from "@/lib/types";
-import { FINANCE_INPUTS } from "@/lib/finance";
+import type { Insight, Entity } from "@/lib/types";
 
 type Props = {
   processSummary: string | null;
@@ -10,6 +9,21 @@ type Props = {
   loading: boolean;
   error: string | null;
   onAnalyze: () => void;
+  // Entities of the shown graph, so the hero card can render the involved
+  // dependency as named, type-colored chips (Maria · Eligibility · spreadsheet).
+  entities?: Entity[];
+  // Whether a process map exists yet. When false, "Run analysis" would no-op, so
+  // the empty state points the user to generate a map first instead.
+  hasMap?: boolean;
+  onGoToSessions?: () => void;
+};
+
+// Entity-type → color, matching the dependency map legend.
+const ENTITY_COLOR: Record<string, string> = {
+  initiative: "var(--c-init)",
+  process: "var(--c-proc)",
+  person: "var(--c-person)",
+  system: "var(--c-system)",
 };
 
 const centerStyle: React.CSSProperties = {
@@ -28,7 +42,7 @@ const CONF_COLOR: Record<string, string> = {
   low: "var(--risk)",
 };
 
-export default function InsightPanel({ processSummary, insights, loading, error, onAnalyze }: Props) {
+export default function InsightPanel({ processSummary, insights, loading, error, onAnalyze, entities, hasMap = true, onGoToSessions }: Props) {
   if (loading) {
     return (
       <div style={centerStyle}>
@@ -50,6 +64,28 @@ export default function InsightPanel({ processSummary, insights, loading, error,
   }
 
   if (!insights || insights.length === 0) {
+    // Without a map, "Run analysis" can't do anything — point to the prior step.
+    if (!hasMap) {
+      return (
+        <div style={centerStyle}>
+          <div style={{
+            border: "1px dashed var(--border)", borderRadius: 12,
+            padding: "26px 20px", textAlign: "center", maxWidth: 280,
+          }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.6" style={{ marginBottom: 12 }}>
+              <path d="M3 12h4l3 8 4-16 3 8h4" />
+            </svg>
+            <p style={{ color: "var(--t1)", fontSize: 13.5, fontWeight: 600, margin: "0 0 6px" }}>
+              Generate a process map first
+            </p>
+            <p style={{ color: "var(--t3)", fontSize: 12.5, marginBottom: 20, lineHeight: 1.6 }}>
+              Analysis runs on the dependency map. Build it from this workspace&rsquo;s sessions, then run the analysis.
+            </p>
+            {onGoToSessions && <ActionButton onClick={onGoToSessions}>Go to sessions</ActionButton>}
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={centerStyle}>
         <div style={{
@@ -76,8 +112,7 @@ export default function InsightPanel({ processSummary, insights, loading, error,
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto", padding: "16px 18px", gap: 14 }}>
       {processSummary && <ProcessSummaryCard summary={processSummary} />}
-      {hero && <HeroCard insight={hero} />}
-      {hero && hero.financialImpact.value > 0 && <FinancialCard insight={hero} />}
+      {hero && <HeroCard insight={hero} entities={entities} />}
       {review && <ReviewCard insight={review} />}
       <div style={{ paddingBottom: 6 }}>
         <ActionButton onClick={onAnalyze} secondary>Re-run analysis</ActionButton>
@@ -106,8 +141,10 @@ function ProcessSummaryCard({ summary }: { summary: string }) {
   );
 }
 
-// ── 2. Insight — the crossover (no money; that is the third beat) ────────────
-function HeroCard({ insight }: { insight: Insight }) {
+// ── 2. The critical finding — crossover + dollar impact + dependency chips ───
+// One bold card so the hero lands: what the risk is, who/what it routes through,
+// what it costs, and the recommended action.
+function HeroCard({ insight, entities }: { insight: Insight; entities?: Entity[] }) {
   const pct = CONF_PCT[insight.confidence] ?? 60;
   const [barW, setBarW] = useState(0);
   useEffect(() => {
@@ -115,64 +152,101 @@ function HeroCard({ insight }: { insight: Insight }) {
     return () => clearTimeout(t);
   }, [pct]);
 
-  return (
-    <div className="atlas-insight-card" style={{
-      background: "var(--surface)", border: "1px solid var(--risk-soft)",
-      borderRadius: 16, padding: "16px 18px",
-      borderColor: "rgba(255,122,89,0.4)",
-    }}>
-      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
-        <Badge kind="risk">
-          <WarnIcon /> {insight.type.replace(/_/g, " ")}
-        </Badge>
-        <Badge kind="neutral">{insight.confidence} confidence</Badge>
-      </div>
-
-      <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--t1)", lineHeight: 1.3, margin: "0 0 8px", letterSpacing: "-0.01em" }}>
-        {insight.title}
-      </h3>
-      <p style={{ fontSize: 13.5, color: "var(--t2)", lineHeight: 1.6, margin: "0 0 14px" }}>
-        {insight.explanation}
-      </p>
-
-      {/* Confidence meter */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px" }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--t4)", whiteSpace: "nowrap" }}>
-          Confidence
-        </span>
-        <span style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--badge-bg)", overflow: "hidden" }}>
-          <span style={{ display: "block", height: "100%", width: `${barW}%`, borderRadius: 3, background: CONF_COLOR[insight.confidence] ?? "var(--c-proc)", transition: "width 1s ease 0.2s" }} />
-        </span>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: CONF_COLOR[insight.confidence] ?? "var(--c-proc)" }}>{pct}%</span>
-      </div>
-
-      {/* Recommended action */}
-      <div style={{ padding: "11px 12px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, margin: 0 }}>
-        <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--t4)", margin: "0 0 3px" }}>
-          Recommended action
-        </p>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--t1)", lineHeight: 1.5 }}>{insight.recommendedAction}</p>
-      </div>
-    </div>
-  );
-}
-
-// ── 3. Action — the financial impact / dollar figure ────────────────────────
-function FinancialCard({ insight }: { insight: Insight }) {
   const dollars = useCountUp(insight.financialImpact.value, 1100);
+  const hasMoney = insight.financialImpact.value > 0;
+
+  // Resolve the involved entity ids to named, type-colored chips (deduped).
+  const byId = new Map((entities ?? []).map((e) => [e.id, e]));
+  const chips = Array.from(new Set(insight.entitiesInvolved))
+    .map((id) => byId.get(id))
+    .filter((e): e is Entity => !!e);
+
   return (
     <div className="atlas-insight-card" style={{
-      background: "var(--surface)", border: "1px solid var(--border)",
-      borderRadius: 16, padding: "16px 18px",
+      background: "var(--surface)", border: "1px solid rgba(255,122,89,0.4)",
+      borderRadius: 16, padding: 0, overflow: "hidden",
     }}>
-      <p style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--t4)", margin: "0 0 12px" }}>
-        Financial impact
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Stat label="Value at stake" value={`$${dollars.toLocaleString("en-US")}`} lead />
-        <Stat label="Throughput protected" value={`${FINANCE_INPUTS.applicationsPerWeek}/wk`} />
+      {/* Risk-tinted header band with the dollar figure */}
+      <div style={{
+        padding: "14px 18px 16px",
+        background: "linear-gradient(180deg, var(--risk-soft) 0%, transparent 100%)",
+        borderBottom: "1px solid var(--border)",
+      }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
+          <Badge kind="risk"><WarnIcon /> {insight.type.replace(/_/g, " ")}</Badge>
+          <Badge kind="neutral">{insight.confidence} confidence</Badge>
+        </div>
+        {hasMoney && (
+          <>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--t4)", margin: "0 0 4px" }}>
+              Annual value at stake
+            </p>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 34, fontWeight: 600, color: "var(--risk)", lineHeight: 1, letterSpacing: "-0.02em" }}>
+                ${dollars.toLocaleString("en-US")}
+              </span>
+              <span style={{ fontSize: 13, color: "var(--t3)" }}>/ year</span>
+            </div>
+          </>
+        )}
       </div>
-      <p style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.5, margin: "10px 0 0" }}>{insight.financialImpact.basis}</p>
+
+      <div style={{ padding: "14px 18px 16px" }}>
+        <h3 style={{ fontSize: 19, fontWeight: 600, color: "var(--t1)", lineHeight: 1.28, margin: "0 0 8px", letterSpacing: "-0.015em" }}>
+          {insight.title}
+        </h3>
+        <p style={{ fontSize: 13.5, color: "var(--t2)", lineHeight: 1.6, margin: "0 0 14px" }}>
+          {insight.explanation}
+        </p>
+
+        {/* The shared dependency, as named chips */}
+        {chips.length > 0 && (
+          <div style={{ margin: "0 0 14px" }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--t4)", margin: "0 0 7px" }}>
+              The shared dependency
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {chips.map((e) => {
+                const c = ENTITY_COLOR[e.type] ?? "var(--t3)";
+                return (
+                  <span key={e.id} style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    fontSize: 12, color: "var(--t1)",
+                    padding: "4px 9px", borderRadius: 999,
+                    background: "var(--bg)", border: `1px solid var(--border)`,
+                  }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} />
+                    {e.name}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Confidence meter */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 14px" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--t4)", whiteSpace: "nowrap" }}>
+            Confidence
+          </span>
+          <span style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--badge-bg)", overflow: "hidden" }}>
+            <span style={{ display: "block", height: "100%", width: `${barW}%`, borderRadius: 3, background: CONF_COLOR[insight.confidence] ?? "var(--c-proc)", transition: "width 1s ease 0.2s" }} />
+          </span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: CONF_COLOR[insight.confidence] ?? "var(--c-proc)" }}>{pct}%</span>
+        </div>
+
+        {/* Recommended action */}
+        <div style={{ padding: "11px 12px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, margin: "0 0 10px" }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--t4)", margin: "0 0 3px" }}>
+            Recommended action
+          </p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--t1)", lineHeight: 1.5 }}>{insight.recommendedAction}</p>
+        </div>
+
+        {hasMoney && (
+          <p style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.5, margin: 0 }}>{insight.financialImpact.basis}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -256,17 +330,6 @@ function ReviewCard({ insight }: { insight: Insight }) {
 }
 
 // ── Small pieces ──────────────────────────────────────────────────────────
-function Stat({ label, value, lead = false }: { label: string; value: string; lead?: boolean }) {
-  return (
-    <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "11px 13px" }}>
-      <p style={{ fontSize: 11, color: "var(--t2)", margin: "0 0 5px" }}>{label}</p>
-      <p style={{ fontFamily: "var(--font-mono)", fontSize: 21, fontWeight: 500, color: lead ? "var(--risk)" : "var(--t1)", margin: 0, lineHeight: 1, letterSpacing: "-0.01em" }}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function Badge({ kind, children }: { kind: "risk" | "neutral" | "warn"; children: React.ReactNode }) {
   const styles: Record<string, React.CSSProperties> = {
     risk: { background: "var(--risk-soft)", color: "var(--risk)" },
