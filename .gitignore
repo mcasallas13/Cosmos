@@ -34,3 +34,16 @@ dev-err.log
 
 # TypeScript build cache
 tsconfig.tsbuildinfo
+
+# runtime-mutable demo data (local "Firestore" stand-in) — written by the app at
+# runtime, NOT source of truth. The committed ground-truth seed (graph.json,
+# expected-*.json/.md, secondary-insight-review.json, transcript-*.md) stays tracked.
+/seed/latest-graph.json
+/seed/latest-analysis.json
+/seed/latest-insights.json
+/seed/saved-sessions/
+/seed/projects/
+/seed/sessions/
+
+# atomic-write temp files
+*.tmp

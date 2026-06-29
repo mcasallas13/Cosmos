@@ -1,10 +1,12 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync } from "fs";
 import { join } from "path";
 import { NextResponse } from "next/server";
 import type { Graph, Entity, Insight, Analysis } from "@/lib/types";
 import { ANALYSIS_SYSTEM } from "@/lib/prompts";
 import { computeFinancialImpact, FINANCE_INPUTS } from "@/lib/finance";
 import { generateWithFallback, stripFences, isValidSessionId } from "@/lib/gemini";
+import { writeFileAtomic } from "@/lib/atomicWrite";
+import { MAX_ENTITIES, MAX_RELATIONSHIPS } from "@/lib/limits";
 
 type Crossover = {
   shared: Entity;
@@ -153,6 +155,17 @@ export async function POST(request: Request) {
   }
   try {
     const { graph, sessionId } = await request.json() as { graph: Graph; sessionId?: string };
+
+    if (!graph || !Array.isArray(graph.entities) || !Array.isArray(graph.relationships)) {
+      return NextResponse.json({ error: "Invalid graph: expected { entities[], relationships[] }" }, { status: 400 });
+    }
+    if (graph.entities.length > MAX_ENTITIES || graph.relationships.length > MAX_RELATIONSHIPS) {
+      return NextResponse.json(
+        { error: `Graph too large (max ${MAX_ENTITIES} entities, ${MAX_RELATIONSHIPS} relationships)` },
+        { status: 413 }
+      );
+    }
+
     const prompt = buildPrompt(graph);
     const { processSummary, insight: hero, entityAttributes: modelAttrs } = await callGemini(prompt);
     hero.financialImpact = computeFinancialImpact();
@@ -177,10 +190,10 @@ export async function POST(request: Request) {
     ) as Insight;
 
     const analysis: Analysis = { processSummary, insights: [hero, secondary], entityAttributes };
-    writeFileSync(join(process.cwd(), "seed", "latest-analysis.json"), JSON.stringify(analysis, null, 2));
+    writeFileAtomic(join(process.cwd(), "seed", "latest-analysis.json"), JSON.stringify(analysis, null, 2));
     if (sessionId && isValidSessionId(sessionId)) {
       const dir = join(process.cwd(), "seed", "sessions");
-      writeFileSync(join(dir, `${sessionId}-analysis.json`), JSON.stringify(analysis, null, 2));
+      writeFileAtomic(join(dir, `${sessionId}-analysis.json`), JSON.stringify(analysis, null, 2));
     }
     return NextResponse.json(analysis);
   } catch (err) {

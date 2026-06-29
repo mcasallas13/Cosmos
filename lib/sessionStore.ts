@@ -1,6 +1,18 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { Session } from "./types";
+import { writeFileAtomic } from "./atomicWrite";
+
+// Parse one store file, returning null (instead of throwing) on corruption so a
+// single bad file never breaks a whole list/delete sweep.
+function readJsonSafe<T>(path: string): T | null {
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as T;
+  } catch {
+    console.warn(`[sessionStore] skipping unreadable file: ${path}`);
+    return null;
+  }
+}
 
 // Saved interview sessions live as one JSON file per session. This is the
 // hackathon-local stand-in for Firestore: durable across restarts, no schema.
@@ -12,10 +24,9 @@ function ensureDir() {
 
 export function saveSession(session: Session): void {
   ensureDir();
-  writeFileSync(
+  writeFileAtomic(
     join(STORE_DIR, `${session.id}.json`),
-    JSON.stringify(session, null, 2),
-    "utf-8"
+    JSON.stringify(session, null, 2)
   );
 }
 
@@ -23,7 +34,8 @@ export function listSavedSessions(): Session[] {
   if (!existsSync(STORE_DIR)) return [];
   return readdirSync(STORE_DIR)
     .filter((f) => f.endsWith(".json"))
-    .map((f) => JSON.parse(readFileSync(join(STORE_DIR, f), "utf-8")) as Session)
+    .map((f) => readJsonSafe<Session>(join(STORE_DIR, f)))
+    .filter((s): s is Session => s !== null)
     .sort((a, b) => (a.id < b.id ? 1 : -1)); // newest first (ids embed a timestamp)
 }
 
@@ -45,8 +57,8 @@ export function deleteSessionsForProject(projectId: string): string[] {
   for (const f of readdirSync(STORE_DIR)) {
     if (!f.endsWith(".json")) continue;
     const path = join(STORE_DIR, f);
-    const session = JSON.parse(readFileSync(path, "utf-8")) as Session;
-    if (session.projectId === projectId) {
+    const session = readJsonSafe<Session>(path);
+    if (session && session.projectId === projectId) {
       unlinkSync(path);
       removed.push(session.id);
     }

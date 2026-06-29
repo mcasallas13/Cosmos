@@ -10,6 +10,25 @@ export const GEMINI_MODELS = [
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
+// Hard ceiling on any single Gemini call. A hung request must never freeze the
+// live demo, so we bound the wait and fail fast (timeouts do NOT trigger model
+// fallback — see shouldFallback — to keep total latency predictable).
+const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS ?? 30_000);
+
+// Reject if `promise` has not settled within `ms`. Used to bound Gemini calls.
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    );
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
+
 // Whether to fall back to the next model in GEMINI_MODELS. We advance on 503
 // (model overloaded) and on 429 (quota/rate-limit exceeded). Free-tier quota is
 // per-model-per-day, so a 429 on one model can succeed on the next one in the
@@ -36,8 +55,15 @@ export async function generateWithFallback(
   let last: Error = new Error("No models available");
   for (const model of GEMINI_MODELS) {
     try {
-      const m = genAI.getGenerativeModel({ model, systemInstruction });
-      const result = await m.generateContent(prompt);
+      const m = genAI.getGenerativeModel(
+        { model, systemInstruction },
+        { timeout: GEMINI_TIMEOUT_MS }
+      );
+      const result = await withTimeout(
+        m.generateContent(prompt),
+        GEMINI_TIMEOUT_MS,
+        `Gemini (${model}) generation`
+      );
       return result.response.text();
     } catch (err) {
       last = err instanceof Error ? err : new Error(String(err));
@@ -61,11 +87,15 @@ export async function transcribeAudio(
   let last: Error = new Error("No models available");
   for (const model of GEMINI_MODELS) {
     try {
-      const m = genAI.getGenerativeModel({ model });
-      const result = await m.generateContent([
-        { text: instruction },
-        { inlineData: { mimeType, data: base64Audio } },
-      ]);
+      const m = genAI.getGenerativeModel({ model }, { timeout: GEMINI_TIMEOUT_MS });
+      const result = await withTimeout(
+        m.generateContent([
+          { text: instruction },
+          { inlineData: { mimeType, data: base64Audio } },
+        ]),
+        GEMINI_TIMEOUT_MS,
+        `Gemini (${model}) transcription`
+      );
       return result.response.text().trim();
     } catch (err) {
       last = err instanceof Error ? err : new Error(String(err));
