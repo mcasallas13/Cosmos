@@ -4,9 +4,17 @@ import { NextResponse } from "next/server";
 import type { Graph, Entity, Insight, Analysis } from "@/lib/types";
 import { ANALYSIS_SYSTEM } from "@/lib/prompts";
 import { computeFinancialImpact, FINANCE_INPUTS } from "@/lib/finance";
-import { generateWithFallback, stripFences, isValidSessionId } from "@/lib/gemini";
+import {
+  generateWithFallback,
+  stripFences,
+  isValidSessionId,
+  MalformedModelOutputError,
+  geminiErrorResponse,
+} from "@/lib/gemini";
 import { writeFileAtomic } from "@/lib/atomicWrite";
+import { validateRefs } from "@/lib/graph";
 import { MAX_ENTITIES, MAX_RELATIONSHIPS } from "@/lib/limits";
+import { K12_PROJECT_ID } from "@/lib/projects";
 
 type Crossover = {
   shared: Entity;
@@ -142,11 +150,15 @@ async function callGemini(
   prompt: string
 ): Promise<{ processSummary: string; insight: Insight; entityAttributes?: EntityAttributes }> {
   const raw = await generateWithFallback(ANALYSIS_SYSTEM, prompt);
-  return JSON.parse(stripFences(raw)) as {
-    processSummary: string;
-    insight: Insight;
-    entityAttributes?: EntityAttributes;
-  };
+  try {
+    return JSON.parse(stripFences(raw)) as {
+      processSummary: string;
+      insight: Insight;
+      entityAttributes?: EntityAttributes;
+    };
+  } catch {
+    throw new MalformedModelOutputError();
+  }
 }
 
 export async function POST(request: Request) {
@@ -154,7 +166,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
   }
   try {
-    const { graph, sessionId } = await request.json() as { graph: Graph; sessionId?: string };
+    const { graph, sessionId, projectId } = await request.json() as {
+      graph: Graph;
+      sessionId?: string;
+      projectId?: string;
+    };
 
     if (!graph || !Array.isArray(graph.entities) || !Array.isArray(graph.relationships)) {
       return NextResponse.json({ error: "Invalid graph: expected { entities[], relationships[] }" }, { status: 400 });
@@ -164,6 +180,11 @@ export async function POST(request: Request) {
         { error: `Graph too large (max ${MAX_ENTITIES} entities, ${MAX_RELATIONSHIPS} relationships)` },
         { status: 413 }
       );
+    }
+
+    const refErrors = validateRefs(graph);
+    if (refErrors.length > 0) {
+      return NextResponse.json({ error: "Reference validation failed", errors: refErrors }, { status: 422 });
     }
 
     const prompt = buildPrompt(graph);
@@ -185,19 +206,32 @@ export async function POST(request: Request) {
       };
     }
 
+    // The secondary human-review finding is specific to the seed K-12 scenario
+    // (it references proc-award / proc-payment). Append it only when the graph
+    // actually contains the entities it points at — so an unrelated user project
+    // never gets this phantom review bolted onto its analysis.
     const secondary = JSON.parse(
       readFileSync(join(process.cwd(), "seed", "secondary-insight-review.json"), "utf-8")
     ) as Insight;
+    const graphIds = new Set(graph.entities.map((e) => e.id));
+    const secondaryMatchesGraph = secondary.entitiesInvolved.every((id) => graphIds.has(id));
+    const insights = secondaryMatchesGraph ? [hero, secondary] : [hero];
 
-    const analysis: Analysis = { processSummary, insights: [hero, secondary], entityAttributes };
-    writeFileAtomic(join(process.cwd(), "seed", "latest-analysis.json"), JSON.stringify(analysis, null, 2));
+    const analysis: Analysis = { processSummary, insights, entityAttributes };
+    // `latest-analysis.json` is the prepared-demo artifact. Writing it on every
+    // user-project analyze would clobber the shared file, so scope it: only the
+    // K-12/prepared default (no projectId, or the reserved id) touches it. User
+    // projects persist their analysis inside their own project JSON instead.
+    if (!projectId || projectId === K12_PROJECT_ID) {
+      writeFileAtomic(join(process.cwd(), "seed", "latest-analysis.json"), JSON.stringify(analysis, null, 2));
+    }
     if (sessionId && isValidSessionId(sessionId)) {
       const dir = join(process.cwd(), "seed", "sessions");
       writeFileAtomic(join(dir, `${sessionId}-analysis.json`), JSON.stringify(analysis, null, 2));
     }
     return NextResponse.json(analysis);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const { status, body } = geminiErrorResponse(err);
+    return NextResponse.json(body, { status });
   }
 }

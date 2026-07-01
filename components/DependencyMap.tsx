@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -8,9 +8,12 @@ import {
   MiniMap,
   Handle,
   Position,
+  useNodesState,
+  useEdgesState,
   type Node,
   type Edge,
   type NodeProps,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import Dagre from "@dagrejs/dagre";
@@ -284,7 +287,8 @@ type Props = {
 };
 
 export default function DependencyMap({ graph, highlightedIds = [] }: Props) {
-  const { nodes: baseNodes, edges: baseEdges } = useMemo(() => buildLayout(graph), [graph]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detail = useMemo(
     () => (selectedId ? describeEntity(graph, selectedId) : null),
@@ -293,24 +297,57 @@ export default function DependencyMap({ graph, highlightedIds = [] }: Props) {
   const selectedColor = selectedId
     ? ENTITY[(graph.entities.find((e) => e.id === selectedId)?.type as EType)]?.color ?? "var(--map-muted)"
     : "var(--map-muted)";
-  const highlighted = useMemo(() => new Set(highlightedIds), [highlightedIds]);
-  const hasHighlight = highlighted.size > 0;
 
-  const nodes = useMemo(
+  // Keep the latest graph readable inside effects that key off structure only.
+  const graphRef = useRef(graph);
+  graphRef.current = graph;
+  const instanceRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
+
+  // Structural key: changes ONLY when topology (entity/relationship ids) changes,
+  // so attribute-only graph re-creations (e.g. hoursPerWeek merge) don't re-layout.
+  const layoutKey = useMemo(
     () =>
-      baseNodes.map((n) => {
-        const isOn = highlighted.has(n.id);
-        return {
-          ...n,
-          className: isOn ? "atlas-node-highlight" : hasHighlight ? "atlas-node-dim" : undefined,
-        };
-      }),
-    [baseNodes, highlighted, hasHighlight]
+      graph.entities.map((e) => e.id).join(",") +
+      "|" +
+      graph.relationships.map((r) => `${r.id}:${r.source}->${r.target}`).join(","),
+    [graph]
   );
 
-  const edges = useMemo(
-    () =>
-      baseEdges.map((e) => {
+  const highlighted = useMemo(() => new Set(highlightedIds), [highlightedIds]);
+  const highlightKey = useMemo(() => [...highlighted].sort().join(","), [highlighted]);
+
+  // Re-seed positions ONLY on structural change.
+  useEffect(() => {
+    const layout = buildLayout(graphRef.current);
+    setNodes(layout.nodes);
+    setEdges(layout.edges);
+    const id = setTimeout(() => instanceRef.current?.fitView({ padding: 0.12 }), 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutKey, setNodes, setEdges]);
+
+  // Apply highlight/dim + edge styling AND refresh attribute-driven node data
+  // by mapping existing arrays by id — preserves dragged positions.
+  useEffect(() => {
+    const g = graphRef.current;
+    const hasHighlight = highlighted.size > 0;
+    const entityById = new Map(g.entities.map((e) => [e.id, e]));
+    setNodes((prev) =>
+      prev.map((n) => {
+        const isOn = highlighted.has(n.id);
+        const e = entityById.get(n.id);
+        const data = e
+          ? { ...(n.data as NodeData), label: e.name, meta: metaFor(e) }
+          : n.data;
+        return {
+          ...n,
+          data,
+          className: isOn ? "atlas-node-highlight" : hasHighlight ? "atlas-node-dim" : undefined,
+        };
+      })
+    );
+    setEdges((prev) =>
+      prev.map((e) => {
         const isOn = highlighted.has(e.source) && highlighted.has(e.target);
         return {
           ...e,
@@ -322,9 +359,10 @@ export default function DependencyMap({ graph, highlightedIds = [] }: Props) {
             strokeWidth: isOn ? 2.4 : 1.4,
           },
         };
-      }),
-    [baseEdges, highlighted, hasHighlight]
-  );
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightKey, layoutKey, setNodes, setEdges]);
 
   return (
     <div style={{
@@ -335,6 +373,9 @@ export default function DependencyMap({ graph, highlightedIds = [] }: Props) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onInit={(inst) => { instanceRef.current = inst; }}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.12 }}

@@ -3,8 +3,15 @@ import { join } from "path";
 import { NextResponse } from "next/server";
 import type { Graph } from "@/lib/types";
 import { EXTRACTION_SYSTEM } from "@/lib/prompts";
-import { generateWithFallback, stripFences, isValidSessionId } from "@/lib/gemini";
+import {
+  generateWithFallback,
+  stripFences,
+  isValidSessionId,
+  MalformedModelOutputError,
+  geminiErrorResponse,
+} from "@/lib/gemini";
 import { writeFileAtomic } from "@/lib/atomicWrite";
+import { validateRefs, GRAPH_RESPONSE_SCHEMA } from "@/lib/graph";
 import { MAX_TRANSCRIPTS, MAX_TRANSCRIPT_TOTAL_CHARS } from "@/lib/limits";
 
 function loadSeedTranscripts(): string {
@@ -23,19 +30,16 @@ function loadSeedTranscripts(): string {
     .join("\n\n");
 }
 
-function validateRefs(graph: Graph): string[] {
-  const ids = new Set(graph.entities.map((e) => e.id));
-  const errors: string[] = [];
-  for (const r of graph.relationships) {
-    if (!ids.has(r.source)) errors.push(`Rel ${r.id}: unknown source "${r.source}"`);
-    if (!ids.has(r.target)) errors.push(`Rel ${r.id}: unknown target "${r.target}"`);
-  }
-  return errors;
-}
-
 async function runExtraction(content: string): Promise<Graph> {
-  const raw = await generateWithFallback(EXTRACTION_SYSTEM, content);
-  return JSON.parse(stripFences(raw)) as Graph;
+  const raw = await generateWithFallback(EXTRACTION_SYSTEM, content, {
+    responseMimeType: "application/json",
+    responseSchema: GRAPH_RESPONSE_SCHEMA,
+  });
+  try {
+    return JSON.parse(stripFences(raw)) as Graph;
+  } catch {
+    throw new MalformedModelOutputError();
+  }
 }
 
 // GET /api/gemini/extract — runs extraction on seed transcripts
@@ -52,8 +56,8 @@ export async function GET() {
     }
     return NextResponse.json(graph);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const { status, body } = geminiErrorResponse(err);
+    return NextResponse.json(body, { status });
   }
 }
 
@@ -103,7 +107,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(graph);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const { status, body } = geminiErrorResponse(err);
+    return NextResponse.json(body, { status });
   }
 }

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type GenerationConfig } from "@google/generative-ai";
 
 // Shared model fallback chain. The first model is the default; later ones are
 // tried only when an earlier one returns a retryable error (see shouldFallback).
@@ -37,6 +37,68 @@ function shouldFallback(err: Error): boolean {
   return err.message.includes("503") || err.message.includes("429");
 }
 
+// Thrown when a model response cannot be parsed into the expected JSON shape.
+export class MalformedModelOutputError extends Error {
+  constructor(message = "Model returned malformed output") {
+    super(message);
+    this.name = "MalformedModelOutputError";
+  }
+}
+
+// Classify a thrown error into an HTTP status + human-readable body. Known
+// retryable classes (malformed output, 429, 503/overload, timeout) get the
+// right status and a `retryable` flag; everything else is an opaque 500.
+export function geminiErrorResponse(err: unknown): {
+  status: number;
+  body: { error: string; code: string; retryable?: boolean };
+} {
+  if (err instanceof MalformedModelOutputError) {
+    return {
+      status: 502,
+      body: {
+        error: "The model returned output that could not be parsed. Please retry.",
+        code: "malformed_output",
+        retryable: true,
+      },
+    };
+  }
+
+  const message = err instanceof Error ? err.message : String(err);
+  const lower = message.toLowerCase();
+
+  if (message.includes("429")) {
+    return {
+      status: 429,
+      body: {
+        error: "Gemini quota or rate limit exceeded. Try again shortly.",
+        code: "rate_limited",
+        retryable: true,
+      },
+    };
+  }
+  if (message.includes("503") || lower.includes("overload")) {
+    return {
+      status: 503,
+      body: {
+        error: "The model is temporarily overloaded. Please retry.",
+        code: "overloaded",
+        retryable: true,
+      },
+    };
+  }
+  if (lower.includes("timed out") || lower.includes("timeout")) {
+    return {
+      status: 503,
+      body: {
+        error: "The model took too long to respond. Please retry.",
+        code: "timeout",
+        retryable: true,
+      },
+    };
+  }
+  return { status: 500, body: { error: message, code: "internal" } };
+}
+
 // Strip markdown fences / surrounding prose from a model response, leaving JSON.
 export function stripFences(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -50,13 +112,14 @@ export function stripFences(text: string): string {
 // retryable error (model overloaded / quota exceeded — see shouldFallback).
 export async function generateWithFallback(
   systemInstruction: string,
-  prompt: string
+  prompt: string,
+  generationConfig?: GenerationConfig
 ): Promise<string> {
   let last: Error = new Error("No models available");
   for (const model of GEMINI_MODELS) {
     try {
       const m = genAI.getGenerativeModel(
-        { model, systemInstruction },
+        { model, systemInstruction, generationConfig },
         { timeout: GEMINI_TIMEOUT_MS }
       );
       const result = await withTimeout(
