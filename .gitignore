@@ -29,7 +29,8 @@ dev-out.log
 dev-err.log
 
 # local editor / tool state
-/.claude/
+/.claude/*
+!/.claude/agents/
 /.vscode/
 
 # TypeScript build cache
